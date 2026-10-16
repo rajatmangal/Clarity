@@ -351,7 +351,7 @@ export default function Home() {
   if (!data)
     return (
       <div className="boot">
-        <div className="brand-mark">f</div>
+        <img className="clarity-mark" src="/brand/clarity.svg" alt="Clarity" width="48" height="48" />
         <h2>
           {error
             ? "Could not open your ledger"
@@ -438,7 +438,7 @@ export default function Home() {
         </a>
         <div className="workspace">
           <span className="avatar">
-            {state?.displayName?.trim().slice(0, 1).toUpperCase() || "F"}
+            {state?.displayName?.trim().slice(0, 1).toUpperCase() || "C"}
           </span>
           <div>
             {state?.displayName
@@ -526,7 +526,7 @@ export default function Home() {
               <RefreshCw size={16} />
             </button>
             <span className="avatar small">
-              {state?.displayName?.trim().slice(0, 1).toUpperCase() || "F"}
+              {state?.displayName?.trim().slice(0, 1).toUpperCase() || "C"}
             </span>
           </div>
         </header>

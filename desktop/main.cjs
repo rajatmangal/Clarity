@@ -101,7 +101,7 @@ async function start() {
       title: "Welcome to Clarity",
       message: "See your spending. Plan your saving.",
       detail:
-        "Start a new money journal, or open your existing Markdown vault. Close any other Clarity/Folio server using that vault first.",
+        "Start a new money journal, or open your existing Markdown vault. Close any other Clarity server using that vault first.",
       buttons: ["Create a new vault", "Use an existing vault", "Cancel"],
       defaultId: 0,
       cancelId: 2,

@@ -110,19 +110,7 @@ button:focus-visible {
   color: var(--theme-muted, #a88bcd);
   margin-left: -10px;
 }
-.brand-mark {
-  width: 34px;
-  height: 38px;
-  border-radius: 11px 11px 11px 3px;
-  background: var(--theme-accent, #ad96d1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font: italic 700 35px Georgia;
-  letter-spacing: -4px;
-  padding-right: 5px;
-}
+
 .workspace {
   display: flex;
   gap: 10px;
