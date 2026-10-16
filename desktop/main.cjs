@@ -219,7 +219,9 @@ async function start() {
   });
   // Do not log API responses, descriptions, keys, or environment variables.
   worker.stdout?.on("data", () => {});
-  worker.stderr?.on("data", () => {});
+  worker.stderr?.on("data", (data) => {
+    if (process.env.CLARITY_DEBUG_STARTUP === "1") process.stderr.write(data);
+  });
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
     if (exited) throw Error("The local service could not start.");

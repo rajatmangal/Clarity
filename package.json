@@ -54,6 +54,13 @@
       {
         "from": "build-runtime",
         "to": "runtime"
+      },
+      {
+        "from": "build-runtime/node_modules",
+        "to": "runtime/node_modules",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asar": true,

@@ -1,5 +1,7 @@
 # Clarity
 
+**See your spending. Plan your saving.**
+
 A local personal-finance dashboard built with Next.js, React, Recharts, and Lucide. CAD is the default. No database server or bank connection is required.
 
 ## Run
@@ -11,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:4310. For a production build, run `npm run build` followed by `npm start`. Both scripts bind only to 127.0.0.1. Use one server process per vault.
+Open http://localhost:4310. For a production build, run `npm run build` followed by `npm start`. By default, both scripts bind only to 127.0.0.1. Use one server process per vault.
 
 ## Import statements
 
@@ -85,7 +87,7 @@ Homepage shortcuts add expenses, income, refunds, transfers, accounts, balance s
 
 Use **Budget** on Overview or **Edit budgets** on Budgets to edit one category, select several, or select all. Each selected category gets its own monthly amount; group scopes retain combined-versus-separate behavior. Changes save together, and unselected limits stay unchanged.
 
-Income, refund, and transfer entries allow **No category** and **No account**. These are empty cells in Transactions.md. Expenses still require an account. Uncategorized refunds reduce total spending without reducing a specific category budget; transfers stay excluded. Balance snapshots and CSV statement imports still require an account.
+Income and transfer entries have no category. Expenses and refunds require a category. Income, refunds, and transfers allow **No account**. These are empty cells in Transactions.md. Expenses still require an account. Older uncategorized refunds reduce total spending without reducing a specific category budget; transfers stay excluded. Balance snapshots and CSV statement imports still require an account.
 
 Approved merchant matches autofill during manual entry, when the merchant name changes, and when opening an uncategorized transaction for review. Existing chosen categories, including an explicit No category, are preserved. All chart tooltip surfaces, hover highlights, axes, and main series now follow the selected theme.
 
@@ -116,3 +118,40 @@ Move vault accepts an absolute new or empty directory. It creates missing folder
 Transactions have visible Edit/Delete actions and selection checkboxes. Select all includes every result in the current date/search/category/type filters, including other pages. Changing filters clears selection. Deletion requires confirmation and the existing automatic backup retains the previous ledger. Editing includes description, date, amount, account, type, and category; changing imported details may affect future duplicate matching.
 
 Settings includes a display name stored in Settings.md and eight themes. Move vault offers a native folder chooser (macOS Finder dialog, Windows folder browser, or Linux Zenity) plus a path field as a fallback. Choosing a folder does not move records until Move vault is clicked. Existing destination protections still apply.
+
+## Desktop: macOS and Windows
+
+Clarity bundles its own runtime, so installed desktop users do not need Node.js or a terminal. Open the Mac DMG and drag Clarity into Applications, or run the Windows installer. On first launch, create a new vault or choose an existing Markdown vault. Close the browser server first if opening its vault. Settings provides the native folder chooser for moving the vault later.
+
+Desktop configuration lives in the operating system’s application-data directory. The default vault is inside that directory. OpenAI keys are encrypted using the operating system’s secure storage and kept outside the vault; reconnect your key when switching from the browser version. Browser/server mode continues to save keys in its private `.env` file. There is no automatic synchronization between installations.
+
+To develop or build installers from source (Node.js 22+):
+
+```sh
+npm ci
+npm run desktop
+npm run desktop:mac
+npm run desktop:windows
+```
+
+Installers appear in `release/`. Mac targets include Apple Silicon and Intel; Windows targets 64-bit PCs. Build on the destination operating system for release validation. The included GitHub workflow builds installers on macOS and Windows when manually started or when a `v*` tag is pushed. Local builds are unsigned: public distribution still requires Apple signing/notarization and Windows signing credentials. Updates are installed manually; there is no automatic updater yet.
+
+The desktop browser is sandboxed, without Node access. Its private local service requires a per-launch secret. Packaged runtime preparation excludes `.env` files and vault records. A vault lock prevents two Clarity processes on the same computer from writing the same vault.
+
+## Server: browser access from other devices
+
+The same app can run as a single-user server. Copy `.env.example` to `.env` and configure:
+
+```dotenv
+CLARITY_HOST=0.0.0.0
+PORT=4310
+CLARITY_ORIGIN=https://money.example.com
+CLARITY_PASSWORD=replace-with-a-long-unique-password
+VAULT_DIR=/absolute/path/to/your/vault
+```
+
+Run `npm run build`, then `npm run start:server`. Put an HTTPS reverse proxy in front of the service, preserving the configured public Host header. Sign in with username `clarity` and the configured password. For local-network use, set the origin to the exact URL you will open. Basic authentication needs HTTPS on any untrusted network. This is a personal server, not a multi-user service.
+
+Alternatively, set `CLARITY_PASSWORD` and `CLARITY_ORIGIN` in your environment and run `docker compose up --build -d`. The provided Compose file binds to localhost for use behind a reverse proxy and persists the vault/configuration in the `clarity-data` volume. Back up that volume. Server storage paths refer to the server; a client browser cannot select a server folder through Finder or Explorer.
+
+Run `npm test` for unit tests. After `npm run desktop:prepare`, run `npm run test:integration` to verify authenticated server access, protected writes, and server storage behavior using a disposable vault.
