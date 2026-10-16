@@ -1,4 +1,4 @@
-# Folio
+# Clarity
 
 A local personal-finance dashboard built with Next.js, React, Recharts, and Lucide. CAD is the default. No database server or bank connection is required.
 

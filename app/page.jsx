@@ -280,7 +280,7 @@ export default function Home() {
       method,
       headers: {
         "Content-Type": "application/json",
-        "X-Folio-Token": meta.token,
+        "X-Clarity-Token": meta.token,
       },
       body: JSON.stringify(body),
     });
@@ -406,7 +406,7 @@ export default function Home() {
     setTxPage(0);
   }
   const currentTitle = {
-    Overview: "Your money, in perspective.",
+    Overview: "See your spending. Plan your saving.",
     Analysis: "See the patterns. Choose your next move.",
     Transactions: "Every little thing adds up.",
     Budgets: "Make room for what matters.",
@@ -432,7 +432,8 @@ export default function Home() {
             setPage("Overview");
           }}
         >
-          <span className="brand-mark">f</span>folio
+          <img className="clarity-mark" src="/brand/clarity.svg" alt="" />
+          clarity
           <span className="brand-dot">.</span>
         </a>
         <div className="workspace">
@@ -1681,7 +1682,7 @@ export default function Home() {
             </>
           )}
           <footer>
-            <span className="footer-brand">folio.</span>
+            <span className="footer-brand">clarity.</span>
             <span>A little intention goes a long way.</span>
             <span>
               {state.currency} <span className="footer-dot">·</span> All systems
@@ -2202,7 +2203,7 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
       </div>
       <section className="panel merchant-rules">
         <PanelTitle
-          title="What Folio remembers"
+          title="What Clarity remembers"
           subtitle="Your category choices teach future imports. These rules take priority over AI."
         />
         {state.merchantRules?.length ? (
@@ -2256,7 +2257,7 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
           </div>
         ) : (
           <p className="body-copy">
-            Choose a category on a transaction or in an import preview. Folio
+            Choose a category on a transaction or in an import preview. Clarity
             remembers the cleaned merchant name and fills it in next time,
             without an AI call.
           </p>
