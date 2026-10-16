@@ -1,0 +1,13 @@
+services:
+  clarity:
+    build: .
+    ports:
+      - '127.0.0.1:4310:4310'
+    environment:
+      CLARITY_PASSWORD: ${CLARITY_PASSWORD:?Set a server password}
+      CLARITY_ORIGIN: ${CLARITY_ORIGIN:-http://localhost:4310}
+    volumes:
+      - clarity-data:/data
+    restart: unless-stopped
+volumes:
+  clarity-data:

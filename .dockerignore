@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+vault
+release
+build-runtime
+artifacts
+*.png
+*.jpg
+!public/brand/*.png

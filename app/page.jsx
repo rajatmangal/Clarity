@@ -3636,8 +3636,9 @@ function SettingsPage({
               OpenAI account.
             </p>
             <p>
-              Your key is saved in this app’s .env file, outside your Markdown
-              vault. It stays connected after restarting.
+              {meta.platform === "desktop"
+                ? "Your key is protected by your operating system and stays connected after restarting."
+                : "Your key is saved in this app’s .env file, outside your Markdown vault. It stays connected after restarting."}
             </p>
           </div>
           <form
@@ -3746,7 +3747,11 @@ function SettingsPage({
           <FolderOpen size={22} />
           <div>
             <h2>Storage & backups</h2>
-            <p>Your files stay on your computer, ready for Obsidian.</p>
+            <p>
+              {meta.platform === "server"
+                ? "Your files stay on your server, ready for Obsidian."
+                : "Your files stay on your computer, ready for Obsidian."}
+            </p>
           </div>
         </div>
         <div className="settings-row">
@@ -3861,7 +3866,7 @@ function SettingsPage({
             <div className="dialog-body">
               <Button
                 type="button"
-                disabled={working}
+                disabled={working || meta.folderPickerAvailable === false}
                 onClick={async () => {
                   setWorking(true);
                   setVaultError("");
@@ -3879,8 +3884,9 @@ function SettingsPage({
                 {working ? "Choosing folder…" : "Choose folder…"}
               </Button>
               <p className="form-note">
-                Opens your computer’s folder picker. Select an empty folder, or
-                create a new one there.
+                {meta.platform === "server"
+                  ? "Enter a new or empty folder path on the server. Your browser cannot select a folder on another computer."
+                  : "Opens your computer’s folder picker. Select an empty folder, or create a new one there."}
               </p>
               <Field
                 label="Selected folder"
