@@ -1,0 +1,14 @@
+.env
+vault/*
+!vault/.gitkeep
+node_modules/
+.DS_Store
+.next/
+.env.*
+!.env.example
+/*.png
+/*.jpg
+release/
+build-runtime/
+artifacts/
+*.log

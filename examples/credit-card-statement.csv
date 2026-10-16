@@ -1,0 +1,4 @@
+Transaction Date,Merchant,Debit,Credit
+2026-10-02,Example groceries,120.50,
+2026-10-03,Payment received,,500.00
+2026-10-04,Example return,,20.00
