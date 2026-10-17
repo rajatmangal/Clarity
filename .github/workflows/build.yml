@@ -70,6 +70,8 @@ jobs:
           cat > release-notes.md <<'EOF'
           See your spending. Plan your saving.
 
+          Includes guided setup for your name, currency, Markdown vault location, and theme, with explanations of local storage and optional AI. Reopen it from Settings anytime.
+
           Download the Apple Silicon or Intel DMG for macOS, or the x64 EXE installer for Windows. Desktop builds include their runtime; Node.js is not required.
 
           These are unsigned preview builds. Apple signing/notarization and Windows signing are not configured. Operating systems may show publisher warnings. Back up your Markdown vault before upgrading, and close other Clarity instances using that vault.

@@ -6,6 +6,7 @@ import {
 } from "../public/currencies.js";
 import { useEffect, useRef, useState } from "react";
 import AnalysisPage from "./analysis-page";
+import Onboarding from "./onboarding";
 import {
   merchantGroups,
   merchantGroupKey,
@@ -191,7 +192,8 @@ export default function Home() {
     [toast, setToast] = useState(""),
     [busy, setBusy] = useState(false),
     [demo, setDemo] = useState(null),
-    [mobile, setMobile] = useState(false);
+    [mobile, setMobile] = useState(false),
+    [setupOpen, setSetupOpen] = useState(false);
   const [period, setPeriod] = useState("month"),
     [month, setMonth] = useState(today().slice(0, 7)),
     [year, setYear] = useState(new Date().getFullYear()),
@@ -351,7 +353,13 @@ export default function Home() {
   if (!data)
     return (
       <div className="boot">
-        <img className="clarity-mark" src="/brand/clarity.svg" alt="Clarity" width="48" height="48" />
+        <img
+          className="clarity-mark"
+          src="/brand/clarity.svg"
+          alt="Clarity"
+          width="48"
+          height="48"
+        />
         <h2>
           {error
             ? "Could not open your ledger"
@@ -365,6 +373,41 @@ export default function Home() {
           </Button>
         )}
       </div>
+    );
+  if (!demo && (!data.onboardingCompleted || setupOpen))
+    return (
+      <Onboarding
+        state={data}
+        meta={meta}
+        api={api}
+        onCancel={data.onboardingCompleted ? () => setSetupOpen(false) : null}
+        onFinish={async (preferences, vaultPath) => {
+          let revision = meta.revision;
+          if (vaultPath.trim() !== meta.vaultPath) {
+            const moved = await api("vault", {
+              path: vaultPath.trim(),
+              revision,
+            });
+            revision = moved.revision;
+            setMeta((m) => ({ ...m, ...moved }));
+            if (moved.cleanupWarning) notify(moved.cleanupWarning);
+          }
+          const result = await api(
+            "state",
+            {
+              state: { ...data, ...preferences, onboardingCompleted: true },
+              revision,
+            },
+            "PUT",
+          );
+          setData(result.state);
+          setMeta((m) => ({ ...m, revision: result.revision }));
+          setSetupOpen(false);
+          notify(
+            "Your journal is ready. Add an account or import your first statement.",
+          );
+        }}
+      />
     );
   const budget = summary?.budgetTotal || 0;
   const aiReady =
@@ -1677,6 +1720,7 @@ export default function Home() {
                     setPage("Transactions");
                   }}
                   reviewBalances={() => setPage("Accounts")}
+                  openSetup={() => setSetupOpen(true)}
                 />
               )}
             </>
@@ -3470,6 +3514,7 @@ function SettingsPage({
   demo,
   reviewTransactions,
   reviewBalances,
+  openSetup,
 }) {
   const [displayName, setDisplayName] = useState(state.displayName || "");
   const [currency, setCurrency] = useState(state.currency),
@@ -3495,6 +3540,10 @@ function SettingsPage({
             <h2>Your profile</h2>
             <p>A personal touch for your money journal.</p>
           </div>
+          <Button disabled={disabled} onClick={openSetup}>
+            <Sparkles size={16} />
+            Open setup guide
+          </Button>
         </div>
         <form
           className="settings-row"

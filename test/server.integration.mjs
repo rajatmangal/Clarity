@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, cp } from "node:fs/promises";
+import { mkdtemp, rm, cp, mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
 import os from "node:os";
@@ -51,6 +51,18 @@ test("packaged server protects data and accepts authorized read/write requests",
     }
     assert.equal(ready, true, "server started");
     assert.equal((await fetch(origin + "/api/state")).status, 401);
+    await mkdir(path.join(root, "vault"), { recursive: true });
+    const lock = path.join(root, "vault", ".clarity.lock");
+    await writeFile(
+      lock,
+      JSON.stringify({ pid: process.pid, id: "other-instance" }),
+    );
+    const locked = await fetch(origin + "/api/state", {
+      headers: { authorization: auth },
+    });
+    assert.equal(locked.status, 400);
+    assert.match((await locked.json()).error, /already open/);
+    await rm(lock);
     const initial = await fetch(origin + "/api/state", {
       headers: { authorization: auth },
     });

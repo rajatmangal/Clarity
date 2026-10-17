@@ -258,6 +258,7 @@ export function upgradeState(state) {
     ...state,
     theme: state.theme || "lavender",
     displayName: state.displayName || "",
+    onboardingCompleted: state.onboardingCompleted ?? false,
     merchantRules: state.merchantRules || [],
     budgetOverrides: state.budgetOverrides || [],
     chartPreferences: state.chartPreferences || [],

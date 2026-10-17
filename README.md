@@ -19,9 +19,9 @@ Everything you record is saved in a Markdown vault on your computer. You choose 
 Desktop installers include everything needed to run the app. No Node.js, terminal, or database setup is required.
 
 <p>
-  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-arm64.dmg"><img src="docs/assets/download-mac-arm64.svg" alt="Download for macOS — Apple Silicon" width="256" height="76"></a>
-  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-x64.dmg"><img src="docs/assets/download-mac-intel.svg" alt="Download for macOS — Intel" width="256" height="76"></a>
-  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-win-x64.exe"><img src="docs/assets/download-windows.svg" alt="Download for Windows — 64-bit" width="256" height="76"></a>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.1.0/Clarity-1.1.0-mac-arm64.dmg"><img src="docs/assets/download-mac-arm64.svg" alt="Download for macOS — Apple Silicon" width="256" height="76"></a>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.1.0/Clarity-1.1.0-mac-x64.dmg"><img src="docs/assets/download-mac-intel.svg" alt="Download for macOS — Intel" width="256" height="76"></a>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.1.0/Clarity-1.1.0-win-x64.exe"><img src="docs/assets/download-windows.svg" alt="Download for Windows — 64-bit" width="256" height="76"></a>
 </p>
 
 Prefer a browser or your own server?
@@ -31,9 +31,9 @@ Prefer a browser or your own server?
   <a href="#host-your-own-server"><img src="docs/assets/self-host.svg" alt="Self-host with Docker or Node.js" width="256" height="76"></a>
 </p>
 
-Download installers from the [v1.0.0 release](https://github.com/rajatmangal/Clarity/releases/tag/v1.0.0). Installers are attached to GitHub Releases rather than stored in the source repository.
+Download installers from the [v1.1.0 release](https://github.com/rajatmangal/Clarity/releases/tag/v1.1.0). Installers are attached to GitHub Releases rather than stored in the source repository.
 
-**Build status:** version 1.0.0 is an unsigned development build. Apple Silicon launch has been checked; Windows and Intel installers still need native-device validation. Operating systems may show publisher warnings. Signing and Apple notarization are not configured yet.
+**Build status:** version 1.1.0 is an unsigned development build. Apple Silicon launch has been checked; Windows and Intel installers still need native-device validation. Operating systems may show publisher warnings. Signing and Apple notarization are not configured yet.
 
 On **Mac**, open the DMG and drag Clarity into Applications. On **Windows**, run the installer and follow its prompts. On first launch, create a new vault or select an existing Clarity vault. Close any other Clarity instance using that vault first.
 
@@ -59,6 +59,8 @@ On **Mac**, open the DMG and drag Clarity into Applications. On **Windows**, run
 - **Make it yours:** eight themes, a display name, and a currency dropdown with CAD, USD, and INR favourites.
 
 ## Your first five minutes
+
+On first launch, Clarity walks you through your name (optional), currency, vault folder, and theme. It explains what each file holds, where backups live, and how optional AI works. Review your choices before finishing; changing the folder moves the current vault only after you confirm. Reopen the guide from **Settings → Open setup guide** anytime.
 
 1. Open **Settings** and choose your currency before adding transactions or balances. CAD is the default.
 2. Add an account, then choose **Import statement** and select its CSV.
