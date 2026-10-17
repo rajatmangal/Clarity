@@ -1,7 +1,7 @@
 {
   "name": "clarity-finance",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 4310",
@@ -12,9 +12,9 @@
     "desktop:prepare": "npm run build && node scripts/prepare-desktop.mjs",
     "desktop": "npm run desktop:prepare && electron .",
     "desktop:run": "electron .",
-    "desktop:pack": "npm run desktop:prepare && electron-builder --dir --publish never",
-    "desktop:mac": "npm run desktop:prepare && electron-builder --mac --publish never",
-    "desktop:windows": "npm run desktop:prepare && electron-builder --win --publish never",
+    "desktop:pack": "npm run desktop:prepare && electron-builder --config desktop/build-config.cjs --dir --publish never",
+    "desktop:mac": "npm run desktop:prepare && electron-builder --config desktop/build-config.cjs --mac --publish never",
+    "desktop:windows": "npm run desktop:prepare && electron-builder --config desktop/build-config.cjs --win --publish never",
     "test:integration": "node --test test/server.integration.mjs"
   },
   "engines": {

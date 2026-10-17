@@ -98,6 +98,12 @@ A Dockerfile and Compose configuration are included. The default Compose port is
 
 See the **[server setup guide](docs/USER_GUIDE.md#server-browser-access-from-other-devices)** for configuration and Docker instructions.
 
+## macOS installation and “damaged app” messages
+
+Mac preview builds without a Developer ID certificate are ad-hoc signed, including the app’s resources and helpers. Packaging verifies the complete signature before creating the DMG or ZIP. Ad-hoc signing protects bundle integrity but does not establish an Apple-verified publisher or replace notarization; Gatekeeper may still block a downloaded preview.
+
+If macOS reports that Clarity is damaged, eject that disk image and replace it with a newly built installer from the download buttons above. Early preview builds could retain an incomplete Electron signature and a dependency link pointing to the build computer. Current packaging embeds the dependency files and rejects unresolved links. Do not disable Gatekeeper to work around an invalid signature. If macOS continues to block the current unsigned preview, use the localhost/source option until Developer ID signing and notarization are configured.
+
 ## Updates
 
 Installed desktop builds check the rolling GitHub release shortly after launch and every six hours while the app is open. An in-app banner and desktop notification announce a newer build. In **Settings → App updates**, check manually or turn automatic checks off. Checks and downloads contact GitHub; they do not include your vault records, balances, or OpenAI key.

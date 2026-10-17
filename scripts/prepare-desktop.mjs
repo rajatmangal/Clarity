@@ -5,6 +5,7 @@ await rm(dest, { recursive: true, force: true });
 await mkdir(dest, { recursive: true });
 await cp(".next/standalone", dest, {
   recursive: true,
+  dereference: true,
   filter: (src) =>
     !path.basename(src).startsWith(".env") &&
     !["vault", ".git", "release", "artifacts", "build-runtime"].includes(
@@ -22,6 +23,8 @@ async function inspect(dir) {
       entry.name === "Balances.md"
     )
       throw Error(`Private data found in runtime: ${entry.name}`);
+    if (entry.isSymbolicLink())
+      throw Error(`Unresolved dependency link in runtime: ${entry.name}`);
     if (entry.isDirectory()) await inspect(path.join(dir, entry.name));
   }
 }
