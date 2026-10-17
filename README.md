@@ -109,7 +109,7 @@ npm run desktop:mac         # Build Apple Silicon and Intel DMGs
 npm run desktop:windows     # Build the Windows x64 installer
 ```
 
-Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on manual runs and `v*` tags. Version tags publish installers as a GitHub prerelease after the tests and all builds succeed. Desktop updates are installed manually.
+Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on every push to `main`, manual runs, and `v*` tags. Download the Mac and Windows installers from the **Artifacts** section of the completed Actions run. Pushes to `main` create build artifacts without publishing a release. Version tags publish installers as a GitHub prerelease after the tests and all builds succeed. Desktop updates are installed manually.
 
 Built with **Next.js, React, Electron, Recharts, and Lucide**. A Markdown vault replaces a database server.
 

@@ -134,7 +134,7 @@ npm run desktop:mac
 npm run desktop:windows
 ```
 
-Installers appear in `release/`. Mac targets include Apple Silicon and Intel; Windows targets 64-bit PCs. Build on the destination operating system for release validation. The included GitHub workflow builds installers on macOS and Windows when manually started or when a `v*` tag is pushed. Local builds are unsigned: public distribution still requires Apple signing/notarization and Windows signing credentials. Updates are installed manually; there is no automatic updater yet.
+Installers appear in `release/`. Mac targets include Apple Silicon and Intel; Windows targets 64-bit PCs. Build on the destination operating system for release validation. The included GitHub workflow builds installers on macOS and Windows on every push to `main`, when manually started, or when a `v*` tag is pushed. Download installers from the completed Actions run’s **Artifacts** section. Only version tags publish a GitHub prerelease after the checks and builds succeed. Local builds are unsigned: public distribution still requires Apple signing/notarization and Windows signing credentials. Updates are installed manually; there is no automatic updater yet.
 
 The desktop browser is sandboxed, without Node access. Its private local service requires a per-launch secret. Packaged runtime preparation excludes `.env` files and vault records. A vault lock prevents two Clarity processes on the same computer from writing the same vault.
 
