@@ -4,7 +4,13 @@
 
 ### See your spending. Plan your saving.
 
-Understand where your money goes, spot overspending, and track your progress—without connecting your bank or setting up a database. Clarity turns CSV statements into a personal money dashboard and keeps your records in readable Markdown files you can open in Obsidian.
+Your money is personal. Your money tracker should be too.
+
+**No signup. No bank connection. Your financial records stay in local files.**
+
+Clarity helps you understand where your money goes, spot overspending, and plan what to save. Import your CSV statements, organize your categories, and see your finances clearly—without creating a Clarity account or uploading your ledger to a company’s cloud.
+
+Everything you record is saved in a Markdown vault on your computer. You choose where it lives, how to back it up, and which tools you use to open it.
 
 **macOS · Windows · Self-hosted web app**
 
@@ -12,15 +18,35 @@ Understand where your money goes, spot overspending, and track your progress—w
 
 Desktop installers include everything needed to run the app. No Node.js, terminal, or database setup is required.
 
-- **[Download for Mac — Apple Silicon](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-arm64.dmg)** — M-series Macs.
-- **[Download for Mac — Intel](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-x64.dmg)** — Intel-based Macs.
-- **[Download for Windows — 64-bit](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-win-x64.exe)** — x64 Windows PCs.
+<p>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-arm64.dmg"><img src="docs/assets/download-mac-arm64.svg" alt="Download for macOS — Apple Silicon" width="256" height="76"></a>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-x64.dmg"><img src="docs/assets/download-mac-intel.svg" alt="Download for macOS — Intel" width="256" height="76"></a>
+  <a href="https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-win-x64.exe"><img src="docs/assets/download-windows.svg" alt="Download for Windows — 64-bit" width="256" height="76"></a>
+</p>
+
+Prefer a browser or your own server?
+
+<p>
+  <a href="#run-in-your-browser"><img src="docs/assets/run-localhost.svg" alt="Run in your browser — localhost setup" width="256" height="76"></a>
+  <a href="#host-your-own-server"><img src="docs/assets/self-host.svg" alt="Self-host with Docker or Node.js" width="256" height="76"></a>
+</p>
 
 Download installers from the [v1.0.0 release](https://github.com/rajatmangal/Clarity/releases/tag/v1.0.0). Installers are attached to GitHub Releases rather than stored in the source repository.
 
 **Build status:** version 1.0.0 is an unsigned development build. Apple Silicon launch has been checked; Windows and Intel installers still need native-device validation. Operating systems may show publisher warnings. Signing and Apple notarization are not configured yet.
 
 On **Mac**, open the DMG and drag Clarity into Applications. On **Windows**, run the installer and follow its prompts. On first launch, create a new vault or select an existing Clarity vault. Close any other Clarity instance using that vault first.
+
+## Why keep your money tracker local?
+
+- **Start without an account.** Open Clarity and get going. No Clarity signup, email address, or bank credentials are needed.
+- **Keep your ledger off our servers.** Clarity has no hosted account database or cloud vault. In desktop and localhost mode, your records stay on your computer.
+- **Use it offline.** Import statements, categorize transactions, set budgets, and explore charts without an internet connection. Optional AI needs internet access.
+- **Keep control of your files.** Your transactions, budgets, categories, balances, and settings are readable Markdown. Open them in Obsidian, move the folder, or keep using the data outside Clarity.
+- **Choose your own backup.** Clarity keeps local recovery snapshots. You decide whether to add an external drive, encrypted backup, or your own sync service.
+- **Understand your spending sooner.** Saved CSV mappings and remembered merchant categories reduce repeat work, so you can focus on where to cut back and how your balances change.
+
+**Cloud use is your choice:** Clarity does not automatically upload or sync your vault. If you place it in a cloud-synced folder or host Clarity on a cloud server, those files live with the provider you choose. If you enable OpenAI categorization, selected descriptions and category examples are sent to OpenAI. AI is optional; the rest of the app works without an API key.
 
 ## What you can do
 
@@ -81,7 +107,7 @@ npm run desktop:mac         # Build Apple Silicon and Intel DMGs
 npm run desktop:windows     # Build the Windows x64 installer
 ```
 
-Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on manual runs and `v*` tags once the project is hosted on GitHub. Version tags publish installers as a GitHub prerelease after the tests and all builds succeed. Desktop updates are installed manually.
+Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on manual runs and `v*` tags. Version tags publish installers as a GitHub prerelease after the tests and all builds succeed. Desktop updates are installed manually.
 
 Built with **Next.js, React, Electron, Recharts, and Lucide**. A Markdown vault replaces a database server.
 
