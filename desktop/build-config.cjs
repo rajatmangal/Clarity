@@ -2,6 +2,13 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const base = require("../package.json").build;
+// Missing GitHub secrets arrive as empty strings. electron-builder treats an
+// empty certificate link as the project directory instead of an absent link.
+for (const name of ["CSC_LINK", "CSC_INSTALLER_LINK", "WIN_CSC_LINK"]) {
+  if (process.env[name] !== undefined && !process.env[name].trim()) {
+    delete process.env[name];
+  }
+}
 const hasIdentity = Boolean(
   process.env.CSC_LINK ||
   process.env.CSC_NAME ||
