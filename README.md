@@ -12,11 +12,11 @@ Understand where your money goes, spot overspending, and track your progress—w
 
 Desktop installers include everything needed to run the app. No Node.js, terminal, or database setup is required.
 
-- **[Download for Mac — Apple Silicon](release/Clarity-1.0.0-mac-arm64.dmg)** — M-series Macs.
-- **[Download for Mac — Intel](release/Clarity-1.0.0-mac-x64.dmg)** — Intel-based Macs.
-- **[Download for Windows — 64-bit](release/Clarity-1.0.0-win-x64.exe)** — x64 Windows PCs.
+- **[Download for Mac — Apple Silicon](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-arm64.dmg)** — M-series Macs.
+- **[Download for Mac — Intel](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-mac-x64.dmg)** — Intel-based Macs.
+- **[Download for Windows — 64-bit](https://github.com/rajatmangal/Clarity/releases/download/v1.0.0/Clarity-1.0.0-win-x64.exe)** — x64 Windows PCs.
 
-**Download availability:** these links point to installers in this local project’s `release/` folder. They are not public download URLs, and installers are excluded from Git. Public release hosting has not been configured yet.
+Download installers from the [v1.0.0 release](https://github.com/rajatmangal/Clarity/releases/tag/v1.0.0). Installers are attached to GitHub Releases rather than stored in the source repository.
 
 **Build status:** version 1.0.0 is an unsigned development build. Apple Silicon launch has been checked; Windows and Intel installers still need native-device validation. Operating systems may show publisher warnings. Signing and Apple notarization are not configured yet.
 
@@ -81,7 +81,7 @@ npm run desktop:mac         # Build Apple Silicon and Intel DMGs
 npm run desktop:windows     # Build the Windows x64 installer
 ```
 
-Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on manual runs and `v*` tags once the project is hosted on GitHub. It does not publish a public release. Desktop updates are installed manually.
+Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on manual runs and `v*` tags once the project is hosted on GitHub. Version tags publish installers as a GitHub prerelease after the tests and all builds succeed. Desktop updates are installed manually.
 
 Built with **Next.js, React, Electron, Recharts, and Lucide**. A Markdown vault replaces a database server.
 
