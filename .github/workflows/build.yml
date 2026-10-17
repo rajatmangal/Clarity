@@ -6,6 +6,10 @@ on:
     tags: ['v*']
 permissions:
   contents: read
+# Serialize each branch/tag so an older build cannot replace a newer one.
+concurrency:
+  group: clarity-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -51,7 +55,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     needs: desktop
     runs-on: ubuntu-latest
     permissions:
@@ -66,7 +70,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_REF: ${{ github.ref }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           cat > release-notes.md <<'EOF'
           See your spending. Plan your saving.
@@ -79,4 +85,37 @@ jobs:
 
           Browser/server setup and the user guide are in the repository README. Updates are installed manually.
           EOF
-          gh release create "$RELEASE_TAG" installers/*.dmg installers/*.exe --verify-tag --prerelease --title "Clarity $RELEASE_TAG" --notes-file release-notes.md
+          set -euo pipefail
+          if [[ "$RELEASE_REF" == "refs/heads/main" ]]; then
+            # Stable filenames keep README links valid across version changes.
+            mkdir latest-installers
+            shopt -s nullglob
+            mac_arm=(installers/Clarity-*-mac-arm64.dmg)
+            mac_intel=(installers/Clarity-*-mac-x64.dmg)
+            windows=(installers/Clarity-*-win-x64.exe)
+            for platform in mac_arm mac_intel windows; do
+              declare -n files="$platform"
+              if [[ "${#files[@]}" -ne 1 ]]; then
+                echo "Expected exactly one installer for $platform" >&2
+                exit 1
+              fi
+            done
+            cp "${mac_arm[0]}" latest-installers/Clarity-mac-arm64.dmg
+            cp "${mac_intel[0]}" latest-installers/Clarity-mac-x64.dmg
+            cp "${windows[0]}" latest-installers/Clarity-windows-x64.exe
+            printf '\nRolling preview from main: https://github.com/%s/commit/%s\n' "$GH_REPO" "$RELEASE_SHA" >> release-notes.md
+            if gh release view latest >/dev/null 2>&1; then
+              gh release upload latest latest-installers/* --clobber
+              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest" -f sha="$RELEASE_SHA" -F force=true
+              gh release edit latest --title "Clarity — Latest build" --notes-file release-notes.md --prerelease --latest=false
+            else
+              gh release create latest latest-installers/* --target "$RELEASE_SHA" --prerelease --latest=false --title "Clarity — Latest build" --notes-file release-notes.md
+            fi
+          else
+            if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+              gh release upload "$RELEASE_TAG" installers/*.dmg installers/*.exe --clobber
+              gh release edit "$RELEASE_TAG" --title "Clarity $RELEASE_TAG" --notes-file release-notes.md --prerelease
+            else
+              gh release create "$RELEASE_TAG" installers/*.dmg installers/*.exe --verify-tag --prerelease --title "Clarity $RELEASE_TAG" --notes-file release-notes.md
+            fi
+          fi
