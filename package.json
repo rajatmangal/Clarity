@@ -12,9 +12,9 @@
     "desktop:prepare": "npm run build && node scripts/prepare-desktop.mjs",
     "desktop": "npm run desktop:prepare && electron .",
     "desktop:run": "electron .",
-    "desktop:pack": "npm run desktop:prepare && electron-builder --dir",
-    "desktop:mac": "npm run desktop:prepare && electron-builder --mac",
-    "desktop:windows": "npm run desktop:prepare && electron-builder --win",
+    "desktop:pack": "npm run desktop:prepare && electron-builder --dir --publish never",
+    "desktop:mac": "npm run desktop:prepare && electron-builder --mac --publish never",
+    "desktop:windows": "npm run desktop:prepare && electron-builder --win --publish never",
     "test:integration": "node --test test/server.integration.mjs"
   },
   "engines": {
