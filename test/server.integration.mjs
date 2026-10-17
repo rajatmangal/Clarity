@@ -69,6 +69,14 @@ test("packaged server protects data and accepts authorized read/write requests",
     assert.equal(initial.status, 200);
     const data = await initial.json();
     assert.equal(data.platform, "server");
+    assert.equal(
+      (
+        await fetch(origin + "/api/updates", {
+          headers: { authorization: auth },
+        })
+      ).status,
+      404,
+    );
     assert.equal(data.folderPickerAvailable, false);
     assert.equal(data.state.transactions.length, 0);
     const headers = {
@@ -77,6 +85,16 @@ test("packaged server protects data and accepts authorized read/write requests",
       "X-Clarity-Token": data.token,
       Origin: origin,
     };
+    assert.equal(
+      (
+        await fetch(origin + "/api/updates", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ action: "install" }),
+        })
+      ).status,
+      404,
+    );
     assert.equal(
       (
         await fetch(origin + "/api/state", {

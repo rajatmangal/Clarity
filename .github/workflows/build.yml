@@ -43,15 +43,28 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Set desktop build version
+        run: node scripts/ci-build-version.mjs
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - run: ${{ matrix.command }}
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ matrix.label == 'macOS' && secrets.MAC_CSC_LINK || secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ matrix.label == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: Clarity-${{ matrix.label }}
           path: |
             release/*.dmg
             release/*.exe
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
           if-no-files-found: error
 
   release:
@@ -83,10 +96,13 @@ jobs:
 
           These are unsigned preview builds. Apple signing/notarization and Windows signing are not configured. Operating systems may show publisher warnings. Back up your Markdown vault before upgrading, and close other Clarity instances using that vault.
 
-          Browser/server setup and the user guide are in the repository README. Updates are installed manually.
+          Browser/server setup and the user guide are in the repository README. Desktop builds check for updates in-app. Mac automatic installation requires Developer ID signing; unsigned Mac builds provide update notifications and a download link.
           EOF
           set -euo pipefail
           if [[ "$RELEASE_REF" == "refs/heads/main" ]]; then
+            # Keep versioned binaries for clients that already fetched an older manifest.
+            test -s installers/latest.yml
+            test -s installers/latest-mac.yml
             # Stable filenames keep README links valid across version changes.
             mkdir latest-installers
             shopt -s nullglob
@@ -105,17 +121,22 @@ jobs:
             cp "${windows[0]}" latest-installers/Clarity-windows-x64.exe
             printf '\nRolling preview from main: https://github.com/%s/commit/%s\n' "$GH_REPO" "$RELEASE_SHA" >> release-notes.md
             if gh release view latest >/dev/null 2>&1; then
-              gh release upload latest latest-installers/* --clobber
+              gh release upload latest installers/*.dmg installers/*.exe installers/*.zip installers/*.blockmap latest-installers/* --clobber
+              # Publish manifests last, after every file they reference is available.
+              gh release upload latest installers/latest*.yml --clobber
               gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest" -f sha="$RELEASE_SHA" -F force=true
               gh release edit latest --title "Clarity — Latest build" --notes-file release-notes.md --prerelease --latest=false
             else
-              gh release create latest latest-installers/* --target "$RELEASE_SHA" --prerelease --latest=false --title "Clarity — Latest build" --notes-file release-notes.md
+              gh release create latest installers/*.dmg installers/*.exe installers/*.zip installers/*.blockmap latest-installers/* --target "$RELEASE_SHA" --prerelease --latest=false --title "Clarity — Latest build" --notes-file release-notes.md
+              gh release upload latest installers/latest*.yml --clobber
             fi
           else
+            shopt -s nullglob
+            versioned=(installers/*.dmg installers/*.exe installers/*.zip installers/*.blockmap installers/latest*.yml)
             if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-              gh release upload "$RELEASE_TAG" installers/*.dmg installers/*.exe --clobber
+              gh release upload "$RELEASE_TAG" "${versioned[@]}" --clobber
               gh release edit "$RELEASE_TAG" --title "Clarity $RELEASE_TAG" --notes-file release-notes.md --prerelease
             else
-              gh release create "$RELEASE_TAG" installers/*.dmg installers/*.exe --verify-tag --prerelease --title "Clarity $RELEASE_TAG" --notes-file release-notes.md
+              gh release create "$RELEASE_TAG" "${versioned[@]}" --verify-tag --prerelease --title "Clarity $RELEASE_TAG" --notes-file release-notes.md
             fi
           fi

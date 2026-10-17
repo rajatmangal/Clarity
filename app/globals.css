@@ -3400,3 +3400,90 @@ button {
     max-width: 120px;
   }
 }
+
+.update-center {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--card);
+  color: var(--ink);
+}
+.update-banner {
+  margin-bottom: 24px;
+  border-color: var(--purple);
+}
+.update-details {
+  margin: 0 0 28px;
+}
+.update-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.update-heading > svg {
+  color: var(--purple);
+  flex-shrink: 0;
+}
+.update-heading h2 {
+  font-size: 17px;
+}
+.update-heading .icon-button {
+  margin-left: auto;
+}
+.update-center p {
+  color: var(--muted);
+  line-height: 1.65;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.update-center strong {
+  overflow-wrap: anywhere;
+}
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.update-actions small {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+}
+.update-center progress {
+  display: block;
+  margin-top: 16px;
+  width: 100%;
+  accent-color: var(--purple);
+}
+.update-preferences {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.update-preferences label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 600;
+}
+.update-preferences p {
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .update-actions {
+    align-items: stretch;
+  }
+  .update-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 160px;
+  }
+  .update-heading h2 {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+}

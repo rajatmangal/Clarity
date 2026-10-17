@@ -7,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import AnalysisPage from "./analysis-page";
 import Onboarding from "./onboarding";
+import UpdateCenter from "./update-center";
 import {
   merchantGroups,
   merchantGroupKey,
@@ -574,6 +575,13 @@ export default function Home() {
           </div>
         </header>
         <div className="content">
+          {meta.platform === "desktop" && !demo && (
+            <UpdateCenter
+              api={api}
+              details={page === "Settings"}
+              blocked={busy || Boolean(modal)}
+            />
+          )}
           {demo && (
             <div className="demo-banner">
               <Sparkles size={16} />

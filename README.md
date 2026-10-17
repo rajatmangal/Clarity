@@ -98,6 +98,28 @@ A Dockerfile and Compose configuration are included. The default Compose port is
 
 See the **[server setup guide](docs/USER_GUIDE.md#server-browser-access-from-other-devices)** for configuration and Docker instructions.
 
+## Updates
+
+Installed desktop builds check the rolling GitHub release shortly after launch and every six hours while the app is open. An in-app banner and desktop notification announce a newer build. In **Settings → App updates**, check manually or turn automatic checks off. Checks and downloads contact GitHub; they do not include your vault records, balances, or OpenAI key.
+
+On **Windows**, choose **Download update**, wait for verification, then **Restart and install**. Updates never install automatically when you close Clarity. Finish editing before restarting; your saved vault, preferences, and key remain outside the app installation.
+
+On **macOS**, update notifications work, but unsigned builds show **Open latest download**. Automatic installation requires Developer ID signing. The workflow is prepared for signing and notarization once the repository secrets below are configured. Signing checks remain enabled.
+
+Older Clarity builds do not contain the updater: install an updater-enabled build once from the download buttons above. Local development builds do not check the release service. Browser/server installations are updated by their owner through deployment.
+
+Each `main` CI build gets a unique increasing preview version, including retries. Release uploads include versioned binaries and checksums, with updater manifests uploaded last. The permanent README download filenames remain unchanged.
+
+### Optional release signing
+
+Configure these **GitHub repository Actions secrets**; never put certificate files or passwords into the repository:
+
+- `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD`: Developer ID Application certificate (base64 PKCS#12 or a secure certificate URL) and its password.
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`: enable notarization when all three are present.
+- `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`: optional Windows code-signing certificate and password.
+
+Mac ZIP update packages and update metadata are published alongside the DMGs and Windows installer. Versioned update files are retained in the rolling release so a download that has already started can still finish after a newer build is published.
+
 ## Build and test
 
 ```sh
@@ -109,7 +131,7 @@ npm run desktop:mac         # Build Apple Silicon and Intel DMGs
 npm run desktop:windows     # Build the Windows x64 installer
 ```
 
-Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on every push to `main`, manual runs, and `v*` tags. Successful `main` builds update the rolling **Latest build** prerelease with permanent download URLs used by the buttons above. Failed checks or builds leave the previous published download in place. Builds on the same branch run in sequence to avoid older builds replacing newer ones. Version tags publish separate versioned prereleases. Manual runs on `main` also update the rolling release; runs on other branches provide Actions artifacts only. Desktop updates are installed manually.
+Build installers on their destination operating system for release validation. Outputs go into `release/`. The included GitHub Actions workflow builds and uploads installer artifacts on every push to `main`, manual runs, and `v*` tags. Successful `main` builds update the rolling **Latest build** prerelease with permanent download URLs used by the buttons above. Failed checks or builds leave the previous published download in place. Builds on the same branch run in sequence to avoid older builds replacing newer ones. Version tags publish separate versioned prereleases. Manual runs on `main` also update the rolling release; runs on other branches provide Actions artifacts only. Desktop builds check for updates automatically and offer an in-app download and restart action where supported. See [Updates](#updates) below.
 
 Built with **Next.js, React, Electron, Recharts, and Lucide**. A Markdown vault replaces a database server.
 

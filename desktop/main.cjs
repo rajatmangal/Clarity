@@ -6,16 +6,20 @@ const {
   utilityProcess,
   safeStorage,
   session,
+  shell,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const net = require("node:net");
 const { randomBytes } = require("node:crypto");
+const { setupUpdates } = require("./updates.cjs");
 app.setName("Clarity");
+if (process.platform === "win32") app.setAppUserModelId("app.clarity.money");
 if (process.env.CLARITY_TEST_DATA_DIR)
   app.setPath("userData", process.env.CLARITY_TEST_DATA_DIR);
 let window,
   worker,
+  updates,
   origin,
   quitting = false;
 const hasLock = app.requestSingleInstanceLock();
@@ -30,6 +34,7 @@ else {
   });
   app.on("before-quit", () => {
     quitting = true;
+    updates?.stop();
     worker?.kill();
   });
   app.on("window-all-closed", () => {
@@ -128,6 +133,15 @@ async function start() {
       { mode: 0o600 },
     );
   }
+  updates = await setupUpdates({
+    app,
+    shell,
+    showWindow: () => {
+      if (!window && origin) createWindow();
+      else window?.show();
+      window?.focus();
+    },
+  });
   const port = await freePort();
   origin = `http://127.0.0.1:${port}`;
   const secret = randomBytes(32).toString("hex");
@@ -196,7 +210,18 @@ async function start() {
           properties: ["openDirectory", "createDirectory"],
         });
         value = result.canceled ? null : result.filePaths[0];
-      } else throw Error("Unsupported desktop action.");
+      } else if (message.action === "updates-state") value = updates.getState();
+      else if (message.action === "updates-check") {
+        void updates.check();
+        value = updates.getState();
+      } else if (message.action === "updates-download")
+        value = updates.download();
+      else if (message.action === "updates-install") value = updates.install();
+      else if (message.action === "updates-automatic")
+        value = await updates.setAutomatic(message.value);
+      else if (message.action === "updates-open")
+        value = await updates.openDownloads();
+      else throw Error("Unsupported desktop action.");
       worker?.postMessage({ type: "clarity-response", id: message.id, value });
     } catch (error) {
       worker?.postMessage({
@@ -233,6 +258,7 @@ async function start() {
       if (res.ok) {
         createWindow();
         installMenu();
+        updates.start();
         return;
       }
       if (res.status >= 500) {
@@ -256,6 +282,7 @@ function installMenu() {
               label: "Clarity",
               submenu: [
                 { role: "about" },
+                { label: "Check for Updates…", click: showUpdateCheck },
                 { type: "separator" },
                 { role: "hide" },
                 { role: "hideOthers" },
@@ -269,6 +296,9 @@ function installMenu() {
       {
         label: "File",
         submenu: [
+          ...(process.platform !== "darwin"
+            ? [{ label: "Check for Updates…", click: showUpdateCheck }]
+            : []),
           process.platform === "darwin" ? { role: "close" } : { role: "quit" },
         ],
       },
@@ -297,4 +327,20 @@ function installMenu() {
       { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }] },
     ]),
   );
+}
+
+async function showUpdateCheck() {
+  window?.show();
+  const status = await updates.check();
+  if (!["available", "downloading", "ready"].includes(status.status)) {
+    await dialog.showMessageBox(window, {
+      type: "info",
+      title: "Clarity updates",
+      message:
+        status.status === "idle"
+          ? "You’re up to date."
+          : status.error || status.reason || "Checking for updates…",
+      detail: `Installed version: ${status.version}`,
+    });
+  }
 }
