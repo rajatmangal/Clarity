@@ -21,6 +21,24 @@ Choose a bank/debit or credit-card statement, an account, and a CSV. Map the hea
 
 Successful imports save their configuration per account. Next time, select that account and upload the CSV to go directly to preview. Saved column names are matched even if columns move; missing or duplicate headers require editing. Use **Edit settings** during import, or **Accounts → Edit import settings**, to change the saved configuration. Changes affect future imports only. One configuration is retained per account.
 
+### Statement history and completeness
+
+The last preview step asks for the statement's actual start and end dates. Suggested dates are the first and last readable transaction; extend them to the dates printed on your statement, including days without purchases. Check the confirmation only if the file covers that entire period. Excluding new rows or skipping invalid rows records partial coverage. Possible duplicates that were already recorded do not prevent confirmation.
+
+Open **Statements** to see import time, filename, account, period, counts, and warnings. A fingerprint identifies previously recorded CSV text for the same account. The original CSV is not copied into the vault. A duplicate-only upload can be recorded with **Record statement only** without creating transactions.
+
+The account cards show completeness for the selected monthly, yearly, or custom range. The annual grid shows each month's status. Overlapping and adjacent confirmed periods are combined, but gaps remain partial. Use **Confirm a period** to record complete coverage, partial coverage, or explicitly confirmed no activity. No activity requires an empty period; an empty ledger alone never proves completeness. Coverage is a user confirmation, not a verification against your bank's balance.
+
+Editing an amount, date, transaction type, or account, or adding/deleting records in a confirmed period, changes its status to **Needs review**. Category, merchant, and review-status edits alone do not invalidate coverage. Reconfirm after checking the affected records. Overview and Analysis warn when accounts lack full confirmed coverage.
+
+Imports made before this feature do not have reliable batch history. Existing transactions are preserved; confirm their periods manually. Your vault is backed up before the new history files are created.
+
+### Undo an import
+
+Choose **Statements → Undo import** to inspect unchanged, edited, and already deleted transactions. Unchanged transactions created by that batch are removed. Edited transactions are kept by default; an explicit checkbox allows deleting them too. The preview shows the edited records and final deletion count before confirmation.
+
+Undo retains its audit history and stops its statement coverage from counting. Other overlapping confirmations may need review if their records changed. Pre-existing transactions, balance snapshots, accounts, saved import settings, and learned merchant categories are retained. An undone batch cannot be undone again. To import it again, select the CSV; normal duplicate checks still apply to records you kept.
+
 ### Dates
 
 Automatic parsing accepts named months (including `13 Oct 2026`, `October 13th, 2026`, `13Oct2026`), year-first dates, unambiguous numeric dates, common separators, compact `YYYYMMDD`, and dates with times or weekday prefixes. Select Day first / Month first / Year first for ambiguous numeric dates or compact dates such as `13102026`.
@@ -33,19 +51,60 @@ Explicit modes cover Excel/Google Sheets serials (1900 system), Excel's 1904 sys
 
 Custom formats use strict, case-sensitive [Day.js parsing tokens](https://day.js.org/docs/en/parse/string-format), e.g. `DD MMM YYYY`, `MMM D, YYYY`, `DD/MM/YYYY HH:mm:ss`, or `YYYY年MM月DD日`. A year token is required. Use automatic mode for ISO timestamps with offsets. A live date preview shows conversions before import. No parser can infer every bank-specific convention safely; use the custom format or edit the CSV for unusual exports.
 
+## Bulk editing and saved transaction views
+
+In **Transactions**, select individual rows or **Select all matching transactions**. Select all includes matches on every page, not just the visible 25 rows. Changing the search, type, category, account, or date range clears selection. On mobile, selection opens a compact bottom action bar.
+
+Choose **Edit selected** to change category, account, or review status. All fields begin with **Leave unchanged**; current values show **Mixed values** when appropriate. Category changes apply to expenses and refunds. Income and transfers are skipped for category edits, while other chosen changes still apply. Expenses require an account, so a mixed selection containing expenses cannot be changed to No account.
+
+Split categories stay unchanged by default. To change them together, choose a category and explicitly enable **Also change every selected split allocation**. Every allocation receives that category, while allocation amounts, notes, IDs, and the original transaction total remain intact. Use the individual Split action when only some allocations should change. A split with an Uncategorized allocation cannot be marked reviewed until every allocation has a category.
+
+**Preview changes** shows the affected transactions, before/after values, allocation categories, skipped category edits, and unchanged records. Use Back to adjust your choices. **Save changes** writes the whole update together with the existing revision protection and automatic backup. Amounts, dates, kinds, descriptions, and saved merchant rules are preserved. Category and account reports reflect the new classifications. Mark as needs review also works for manually entered or previously reviewed transactions. Existing import undo protections still treat edited imported records as edited records.
+
+The **Your views** bar offers Needs review and Uncategorized shortcuts, plus **Save view** for a named combination of search, type/review status, category, account, and date behavior. Choose among:
+
+- **Follow the dashboard’s selected range** to reuse filters with any month/year/range.
+- **This month** or **This year** to advance dates automatically when you apply the view later.
+- **Keep this exact range** to retain fixed start/end dates.
+
+Choose a view from the dropdown to apply it. Adjusting filters displays **Filters adjusted** without overwriting the saved view. **Manage** saves your current filters under the same view, renames it, or deletes it after confirmation. Deleting a view leaves transactions intact. View names are unique, with a maximum of 100 views and 60 characters per name. Saved views live in **SavedViews.md**, survive restart, and are included in backups and ZIP recovery. Upgrading an older vault adds that table after backing up the old files. If a referenced category or account is deleted, its filter shows a warning and no matching results; choose a replacement and update the view rather than silently broadening it.
+
+## Split purchases and refunds
+
+In **Transactions**, click the **Split** icon between **Edit** and **Delete** on a purchase or refund. It opens an allocation-only dialog with the original amount fixed. Use the same action to manage an existing split. When adding a new transaction, **Split across categories** is also available in the entry form. Enter at least two allocations. Each needs a category and a positive amount; notes are optional. Use **Add allocation** for more rows and **Assign remaining here** to fill one row with the unallocated balance.
+
+Choose **Percentages** to enter shares instead of amounts. Percentages must total exactly 100%. Clarity displays the rounded monetary amounts before saving and distributes rounding so they equal the original total exactly. Switching between amounts and percentages can round entry values; check the displayed amounts before saving. Each saved allocation must receive at least one cent. Over-allocation immediately shows the exact excess amount or percentage and disables saving until corrected. The original total cannot be exceeded.
+
+The original transaction remains one record with its date, account, description, merchant, and full amount. Category budgets and reports use the allocations; account totals and CSV duplicate checks use the original record. Refund allocations reduce spending in their selected categories. Split refunds can have no account, just like ordinary refunds.
+
+The transaction list shows **Split · N allocations**. Expand it to see categories, amounts, and notes. Filtering by a category keeps the original transaction visible and labels the amount belonging to the selected category beneath its full total. Allocation category names and notes are searchable.
+
+Changing the original amount requires amount-based allocations to be rebalanced before saving. In percentage mode, the allocated amounts are recalculated from the new total. To remove a split, choose **Use one category instead**, select a category for the full amount, and save. Cancel leaves the existing split unchanged. Remove the split before switching the transaction to income or transfer.
+
+Split choices do not overwrite remembered merchant categories, and bulk merchant categorization excludes split transactions. Deleting a transaction, including bulk deletion, also deletes its allocations. Deleting a category reassigns affected allocations; moving them to Uncategorized marks the split as needing review.
+
+If an imported transaction is split afterward, **Undo import** treats it as edited and keeps it by default. Explicitly deleting edited records during undo also removes their allocations. Changing only category allocations does not invalidate statement coverage because the account's money records have not changed.
+
+Allocations are stored locally in `TransactionSplits.md`. Existing vaults receive a backup when this file is introduced. Do not delete it manually; it is part of the vault's financial data.
+
 ## Markdown storage
 
 The default vault is `vault/`. Open it in Obsidian. Its tables are the source of truth:
 
 - `Accounts.md`: account identities and types.
 - `Transactions.md`: purchases, income, refunds, transfers, original descriptions, and separate merchant/location/reference fields.
+- `TransactionSplits.md`: allocation IDs, parent transaction IDs, categories, monetary amounts, and optional notes.
 - `Balances.md`: dated account balance snapshots.
 - `Categories.md`: category labels, parents, colors, monthly budgets, and combined/separate budget mode.
 - `ImportProfiles.md`: saved per-account CSV and date configuration.
+- `ImportBatches.md`: statement file fingerprints, import dates, periods, counts, warnings, and undo status. Historical account names are kept even if the account is deleted.
+- `ImportEntries.md`: stable transaction references and original snapshots used to protect later edits during undo. Snapshots contain original transaction fields with amounts in minor units.
+- `StatementCoverage.md`: confirmed or partial periods, no-activity confirmations, notes, and financial-record snapshots used to detect later changes.
 - `Settings.md`: currency, model, and theme preferences.
 - `MerchantRules.md`: remembered merchant-to-category choices.
 - `BudgetOverrides.md`: category limits for individual months and their reasons.
 - `ChartPreferences.md`: pinned and hidden Analysis charts.
+- `SavedViews.md`: named transaction filters and rolling or fixed date behavior.
 - `Money.md`: an Obsidian index and your original notes.
 
 Existing single-file ledgers migrate automatically. The original `Money.md` is backed up before migration. Records keep their IDs, and original notes remain in the index. Each table has a notes section preserved on saves. Preserve table headers, managed markers, and IDs when editing. Reload the dashboard after external edits; conflicting saves are rejected.
@@ -53,6 +112,25 @@ Existing single-file ledgers migrate automatically. The original `Money.md` is b
 Amounts in Markdown use currency units with two decimals; calculations use integer cents. Import profile column indices are zero-based and the header row is one-based. Saved headers are a JSON array inside a Markdown table cell. A tab delimiter is escaped as `&#9;`.
 
 A `.pending-save.md` journal makes interrupted multi-file writes recoverable. The app finishes a pending save on restart before reading records. If a pending write conflicts with a manual edit, it stops and preserves both versions for recovery. `.backups/` retains the latest 30 complete table snapshots plus the original migration backup. Files are local plaintext; back up or encrypt the vault as appropriate. Do not edit during a save or run multiple servers against the same vault.
+
+## Backups, recovery, and exports
+
+Open **Settings → Data & recovery**. Everything in this screen operates locally (on your host machine in server mode).
+
+- **Automatic snapshots** save the previous financial Markdown tables and index before every save. Clarity retains the latest **30 saves, not 30 days**. These snapshots include notes inside the financial tables, but not separate notes or attachments.
+- **Back up now** creates a named vault restore point containing financial Markdown, separate notes, and supported attachments. Named backups and pre-restore safety copies are **not** removed by the automatic 30-save rotation. They remain under `.backups/`; remove unwanted copies through your file manager.
+- **Preview restore** validates the backup and shows before/after record counts, additions, removals, changed records, currency, included files, and warnings about older formats. A preview expires after ten minutes. If current files change, preview again before replacing them.
+- **Replace the current vault** keeps a full supported-file safety copy first, then restores the selected records and included files. Extra current-only notes and attachments remain. To undo a completed restore, preview and restore its **Before restore — recovery copy**. A safety copy of already damaged data is retained for manual inspection, but may not itself be a valid restore point.
+- **Restore into a new folder** accepts a new or empty folder outside the current vault. Clarity verifies the restored copy, saves its location locally, and switches to it. The previous vault stays intact. This differs from **Move vault**, which moves the existing vault and removes the old copy after verification.
+- **Open recovery** is also available on the startup error screen when the ledger cannot open. Import a valid Clarity ZIP there if the current vault has no usable snapshots. Conflicting interrupted saves are preserved and reported rather than overwritten.
+
+**Export vault ZIP** creates an unencrypted, portable Clarity archive. **Import a Clarity backup ZIP** validates it and opens a preview; choosing a ZIP never immediately overwrites data. Only Clarity-generated archives with a supported manifest are accepted. Exports include Markdown, text, CSV/TSV, Obsidian canvas files, PDF, and PNG/JPEG/GIF/WebP/SVG attachments. Hidden files/folders (including `.obsidian` and `.backups`), symlinks, unsupported files, and Clarity’s separately stored API keys or connection credentials are excluded. Personal notes and attachments may still contain information you wrote into them, so handle exported ZIPs as private financial data.
+
+Archive limits: 32 MB compressed, 64 MB expanded, 16 MB per file, and 1,000 files. Restore validates file hashes, paths, schema compatibility, relationships, and split totals. Related files use the recoverable save journal: an interrupted write is completed before the next read/save or on restart. If files were externally edited in conflict with that journal, recovery stops and preserves the versions for inspection. Close Obsidian and other file editors during restoration.
+
+**Export CSV** offers all transactions or the dashboard’s current date/search/type/category filters. Split purchases and refunds produce one row per matching allocation. Columns are Transaction ID, Allocation ID, Date, Type, Merchant, Description, Account, Category, Amount, Net Spending, Original Total (first allocation only), Currency, Allocation Note, Location, and Reference. Amounts use major currency units. Net Spending is positive for expenses, negative for refunds, and zero for income/transfers. Sum Amount or Net Spending for allocation totals; Original Total repeats only once per transaction and still describes the whole purchase when exporting a subset of its categories. Formula-like text is escaped for spreadsheet safety. CSV does not contain the entire vault and cannot replace a recovery backup.
+
+Desktop builds provide **Open backup folder** in Finder/File Explorer. Browser/server mode displays the folder path on the host. A same-drive backup protects against mistakes, not loss of the drive: copy ZIPs to a separate drive yourself when needed. No backup is uploaded automatically.
 
 ## OpenAI (optional)
 
@@ -112,6 +190,23 @@ The import preview and Transactions page can assign a category to a whole mercha
 Settings groups appearance/currency, AI connection/model, and storage/backups. Themes open in a popup. The currency dropdown includes all 178 current ISO 4217 currency and fund codes from [SIX List One](https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml) (2026-09-17), with CAD, USD, and INR first. Currency remains locked when financial records exist; this app does not convert currencies.
 
 Move vault accepts an absolute new or empty directory. It creates missing folders, copies and verifies the complete vault including personal notes and backups, persists VAULT_DIR in .env, switches future saves immediately, and removes the old copy. Close Obsidian before moving. Occupied destinations, nested paths, stale revisions, and unsupported symbolic links are rejected. If cleanup cannot complete, the app reports the remaining recovery copy. The original is retained until configuration commits. API requests are serialized during moves.
+
+## Reinstalling and reopening your vault
+
+Keep your vault folder when reinstalling Clarity. Replacing the application does not require a new vault. If local configuration remains, Clarity remembers the selected folder automatically.
+
+If the folder location is no longer remembered:
+
+1. On desktop first launch, choose **Use an existing vault**, or use **Open existing vault** on the setup guide’s **Your files** step.
+2. You can also use **Settings → Storage & backups → Open existing vault**.
+3. Choose the previous folder containing `Money.md` and your financial Markdown tables. Browser/server users enter a path on the host machine.
+4. Click **Check folder**, review the saved profile, currency, and record counts, then **Open this vault**.
+
+Clarity uses the existing folder in place. It does not move, merge, or replace it with the blank/new vault. Transactions, balances, categories, budgets, rules, saved views, notes, and vault preferences remain in that folder. Unfinished setup choices do not override the existing vault. The previously active folder is retained too; opening a vault is different from **Move vault**.
+
+Unrelated/empty folders, malformed vaults, changed previews, and vaults open in another instance are rejected. Older supported vaults are backed up before their normal migration. A vault with an unfinished save must complete recovery first; the desktop startup chooser opens it through the normal recovery process. The OpenAI key is stored separately and may need reconnecting if application configuration was removed.
+
+Deleting the actual vault folder deletes its files—reinstalling cannot recover deleted files without a backup. Keep the vault and a separate backup when cleaning up an installation.
 
 ## Transaction controls and personalisation
 

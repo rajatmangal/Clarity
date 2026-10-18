@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Clarity — See your spending. Plan your saving.</title>
+  <desc id="desc">A dark teal banner with a Clarity icon, a rising line illustration, and the words No signup, local files, your control.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1"><stop stop-color="#102d35"/><stop offset="1" stop-color="#101827"/></linearGradient>
+    <linearGradient id="mint" x2="1" y2="1"><stop stop-color="#d5fff2"/><stop offset="1" stop-color="#74dcc0"/></linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#74dcc0" stop-opacity=".22"/><stop offset="1" stop-color="#74dcc0" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#background)"/>
+  <circle cx="1090" cy="12" r="270" fill="#74dcc0" opacity=".035"/>
+  <g transform="translate(52 46)">
+    <rect width="66" height="66" rx="18" fill="#1d4248"/>
+    <path d="M46 19a19 19 0 1 0 1 29" fill="none" stroke="url(#mint)" stroke-width="6" stroke-linecap="round"/>
+    <path d="m25 38 8-8 7 4 10-11" fill="none" stroke="#fff8e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif">
+    <text x="136" y="90" fill="#effbf7" font-size="42" font-weight="700" letter-spacing="-1">Clarity</text>
+    <text x="52" y="172" fill="#effbf7" font-size="40" font-weight="600" letter-spacing="-1">See your spending.</text>
+    <text x="52" y="223" fill="#98e7cf" font-size="40" font-weight="600" letter-spacing="-1">Plan your saving.</text>
+    <text x="54" y="295" fill="#bbcecf" font-size="18">No signup. Local files. Your control.</text>
+    <text x="760" y="79" fill="#a5bfc2" font-size="13" letter-spacing="2">A CLEARER VIEW OF YOUR MONEY</text>
+  </g>
+  <g stroke="#355059" stroke-width="1" opacity=".6">
+    <path d="M750 128h390M750 184h390M750 240h390M750 296h390"/>
+  </g>
+  <path d="m760 266 60-28 60 12 60-65 60 21 60-56 65-36v186H760Z" fill="url(#area)"/>
+  <path d="m760 266 60-28 60 12 60-65 60 21 60-56 65-36" fill="none" stroke="url(#mint)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1125" cy="114" r="7" fill="#effbf7"/>
+</svg>
