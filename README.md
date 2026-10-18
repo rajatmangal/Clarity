@@ -6,6 +6,7 @@
 <p align="center"><strong>Your money, with a clearer picture.</strong><br>Personal finance for macOS, Windows, and your own server.</p>
 
 <p align="center">
+  <a href="https://www.rajatmangal.com/clarity">🌐 Website</a> ·
   <a href="#install-clarity">⬇️ Download</a> ·
   <a href="#first-launch-macos-and-windows">🔓 First launch</a> ·
   <a href="#what-you-can-do">✨ Features</a> ·
