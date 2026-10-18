@@ -5,8 +5,37 @@ import {
   favouriteCurrencies,
 } from "../public/currencies.js";
 import { useEffect, useRef, useState } from "react";
+import OpenVaultDialog from "./open-vault-dialog";
 import AnalysisPage from "./analysis-page";
+import BulkTransactionModal from "./bulk-transaction-modal";
+import TransactionViews from "./transaction-views";
+import { matchesTransaction } from "../public/transaction-tools.js";
+import RecoveryPanel from "./recovery-panel";
+import SplitEditor from "./split-editor";
+import SplitTransactionModal from "./split-transaction-modal";
+import {
+  splitsFor,
+  hasSplits,
+  categoryAmount,
+  deleteTransactions,
+  setTransactionSplits,
+  draftSplits,
+  splitBalance,
+} from "../public/transaction-splits.js";
+import StatementsPage, { CoverageNotice } from "./statements-page";
+import { recordImport } from "../public/statement-history.js";
 import Onboarding from "./onboarding";
+import useFolderPicker from "./use-folder-picker";
+import {
+  accountTypes,
+  accountTypeLabel,
+  editAccount,
+  counted,
+  removeAccount,
+  removeCategory,
+  forgetMerchantCategory,
+  setMerchantCategory,
+} from "../public/record-management.js";
 import UpdateCenter from "./update-center";
 import {
   merchantGroups,
@@ -38,6 +67,7 @@ import {
   Search,
   Trash2,
   Pencil,
+  Split,
   RefreshCw,
   Target,
   TrendingUp,
@@ -157,7 +187,14 @@ function Modal({ title, subtitle, children, onClose, wide = false }) {
     ref.current.showModal();
   }, []);
   return (
-    <dialog ref={ref} onCancel={onClose} className={wide ? "wide" : ""}>
+    <dialog
+      ref={ref}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      className={wide ? "wide" : ""}
+    >
       <div className="dialog-head">
         <div>
           <h2>{title}</h2>
@@ -177,6 +214,7 @@ function Modal({ title, subtitle, children, onClose, wide = false }) {
 }
 const nav = [
   ["Overview", LayoutDashboard],
+  ["Statements", FileSpreadsheet],
   ["Analysis", ChartNoAxesCombined],
   ["Transactions", ArrowLeftRight],
   ["Budgets", Target],
@@ -194,7 +232,11 @@ export default function Home() {
     [busy, setBusy] = useState(false),
     [demo, setDemo] = useState(null),
     [mobile, setMobile] = useState(false),
-    [setupOpen, setSetupOpen] = useState(false);
+    [setupOpen, setSetupOpen] = useState(false),
+    [recoveryOpen, setRecoveryOpen] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [page]);
   const [period, setPeriod] = useState("month"),
     [month, setMonth] = useState(today().slice(0, 7)),
     [year, setYear] = useState(new Date().getFullYear()),
@@ -208,6 +250,7 @@ export default function Home() {
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState("all"),
     [catFilter, setCatFilter] = useState("all"),
+    [accountFilter, setAccountFilter] = useState("all"),
     [txPage, setTxPage] = useState(0);
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   useEffect(() => {
@@ -216,6 +259,7 @@ export default function Home() {
     search,
     filter,
     catFilter,
+    accountFilter,
     month,
     year,
     custom.start,
@@ -278,7 +322,7 @@ export default function Home() {
   useEffect(() => {
     load();
   }, []);
-  async function api(path, body, method = "POST") {
+  async function api(path, body, method = "POST", signal) {
     const r = await fetch("/api/" + path, {
       method,
       headers: {
@@ -286,6 +330,7 @@ export default function Home() {
         "X-Clarity-Token": meta.token,
       },
       body: JSON.stringify(body),
+      signal,
     });
     const d = await r.json();
     if (!r.ok) throw Error(d.error);
@@ -351,9 +396,46 @@ export default function Home() {
   function close() {
     setModal(null);
   }
+  function opened(result) {
+    setData(result.state);
+    setMeta((m) => ({
+      ...m,
+      revision: result.revision,
+      vaultPath: result.vaultPath,
+    }));
+    setError("");
+    setSetupOpen(false);
+    setPage("Overview");
+    setSearch("");
+    setFilter("all");
+    setCatFilter("all");
+    setAccountFilter("all");
+    setSelectedTransactions([]);
+    load();
+    notify(
+      "Existing vault opened. Your saved records and preferences are ready.",
+    );
+  }
+  function restored(result) {
+    setData(result.state);
+    setMeta((m) => ({
+      ...m,
+      revision: result.revision,
+      vaultPath: result.vaultPath,
+    }));
+    setError("");
+    setRecoveryOpen(false);
+    setPage("Overview");
+    load();
+    notify(
+      result.safetyBackup
+        ? "Vault restored. A safety copy of your previous files is available in Settings."
+        : "Restored vault verified and opened.",
+    );
+  }
   if (!data)
     return (
-      <div className="boot">
+      <div className={recoveryOpen ? "recovery-boot" : "boot"}>
         <img
           className="clarity-mark"
           src="/brand/clarity.svg"
@@ -368,16 +450,34 @@ export default function Home() {
         </h2>
         <p>{error || "Loading your local money journal…"}</p>
         {error && (
-          <Button onClick={load}>
-            <RefreshCw size={16} />
-            Try again
-          </Button>
+          <div className="recovery-boot-actions">
+            <Button onClick={load}>
+              <RefreshCw size={16} />
+              Try again
+            </Button>
+            <Button onClick={() => setRecoveryOpen(!recoveryOpen)}>
+              Open recovery
+            </Button>
+          </div>
+        )}
+        {recoveryOpen && (
+          <RecoveryPanel
+            api={api}
+            meta={meta}
+            onMeta={(info) => setMeta((m) => ({ ...m, ...info }))}
+            onRestored={restored}
+            Modal={Modal}
+            Button={Button}
+            Field={Field}
+          />
         )}
       </div>
     );
   if (!demo && (!data.onboardingCompleted || setupOpen))
     return (
       <Onboarding
+        key={meta.vaultPath}
+        onOpenVault={opened}
         state={data}
         meta={meta}
         api={api}
@@ -416,35 +516,57 @@ export default function Home() {
     !!meta.models?.some((m) => m.id === state.model) &&
     !demo;
   const worth = netWorth(state, end || today());
+  const hasKnownWorth = worth.accounts.some((a) => a.balance !== null);
+  const balanceGroupValue = (debt) => {
+    const accounts = worth.accounts.filter(
+      (a) => ["credit", "loan"].includes(a.type) === debt,
+    );
+    return accounts.length && accounts.every((a) => a.balance === null)
+      ? "—"
+      : fmt(accounts.reduce((sum, a) => sum + (a.balance || 0), 0));
+  };
   const priorDate = new Date((start || today()) + "T12:00:00");
   priorDate.setDate(priorDate.getDate() - 1);
   const priorWorth = netWorth(state, dateString(priorDate));
   const worthCaption = worth.missing
-    ? `${worth.missing} accounts missing balances`
+    ? `${counted(worth.missing, "account")} missing ${worth.missing === 1 ? "a balance" : "balances"}`
     : priorWorth.missing === 0 && state.accounts.length
       ? `${worth.total - priorWorth.total >= 0 ? "+" : ""}${fmt(worth.total - priorWorth.total)} since start of range`
       : "Record earlier snapshots to compare progress";
   const filtered = (summary?.tx || [])
-    .filter(
-      (t) =>
-        (filter === "all" || filter === "review"
-          ? filter !== "review" || needsReview(t)
-          : t.kind === filter) &&
-        (catFilter === "all" ||
-          categoryIds(state.categories, catFilter).includes(t.category)) &&
-        ([t.description, t.merchant, t.location, t.reference]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-          state.accounts
-            .find((a) => a.id === t.account)
-            ?.name.toLowerCase()
-            .includes(search.toLowerCase())),
+    .filter((t) =>
+      matchesTransaction(state, t, {
+        search,
+        type: filter,
+        category: catFilter,
+        account: accountFilter,
+      }),
     )
     .sort((a, b) => b.date.localeCompare(a.date));
+  function applyTransactionView(filters, dateMode) {
+    setSearch(filters.search);
+    setFilter(filters.type);
+    setCatFilter(filters.category);
+    setAccountFilter(filters.account);
+    if (filters.start && filters.end) {
+      if (dateMode === "month") {
+        setMonth(filters.start.slice(0, 7));
+        setPeriod("month");
+      } else if (dateMode === "year") {
+        setYear(Number(filters.start.slice(0, 4)));
+        setPeriod("year");
+      } else {
+        setCustom({ start: filters.start, end: filters.end });
+        setPeriod("custom");
+      }
+    }
+    setSelectedTransactions([]);
+    setTxPage(0);
+  }
   function jumpCategory(id) {
     setCatFilter(id);
+    setAccountFilter("all");
+    setSearch("");
     setFilter("all");
     setPage("Transactions");
     setTxPage(0);
@@ -456,6 +578,7 @@ export default function Home() {
     Budgets: "Make room for what matters.",
     Categories: "A place for every purchase.",
     Accounts: "See how far you’ve come.",
+    Statements: "Every statement. A clearer picture.",
     Settings: "A space that’s yours.",
   }[page];
   return (
@@ -610,17 +733,19 @@ export default function Home() {
               <p>
                 {page === "Overview"
                   ? "Know where it goes. Decide where you grow."
-                  : page === "Analysis"
-                    ? "Compare months, understand your merchants, and make this view your own."
-                    : page === "Transactions"
-                      ? "One clear view of your spending, income, and everything in between."
-                      : page === "Budgets"
-                        ? "Thoughtful limits, with plenty of room to live."
-                        : page === "Accounts"
-                          ? "Record your balances and follow your progress over time."
-                          : page === "Categories"
-                            ? "Organize merchants, group your spending, and set limits that fit."
-                            : "Your appearance, preferences, and local files."}
+                  : page === "Statements"
+                    ? "Track what you imported, confirm coverage, and safely undo a batch."
+                    : page === "Analysis"
+                      ? "Compare months, understand your merchants, and make this view your own."
+                      : page === "Transactions"
+                        ? "One clear view of your spending, income, and everything in between."
+                        : page === "Budgets"
+                          ? "Thoughtful limits, with plenty of room to live."
+                          : page === "Accounts"
+                            ? "Record your balances and follow your progress over time."
+                            : page === "Categories"
+                              ? "Organize merchants, group your spending, and set limits that fit."
+                              : "Your appearance, preferences, and local files."}
               </p>
             </div>
             {!["Settings", "Categories"].includes(page) && (
@@ -737,6 +862,14 @@ export default function Home() {
             </div>
           ) : (
             <>
+              {["Overview", "Analysis"].includes(page) && (
+                <CoverageNotice
+                  state={state}
+                  start={start}
+                  end={end}
+                  onOpen={() => setPage("Statements")}
+                />
+              )}
               {page === "Overview" && (
                 <>
                   <button
@@ -836,7 +969,7 @@ export default function Home() {
                     <Metric
                       label="Total spending"
                       value={fmt(summary.spending)}
-                      caption={`${summary.tx.filter((t) => t.kind === "expense").length} purchases · refunds deducted`}
+                      caption={`${counted(summary.tx.filter((t) => t.kind === "expense").length, "purchase")} · refunds deducted`}
                       icon={ArrowUpRight}
                     />
                     <Metric
@@ -858,7 +991,7 @@ export default function Home() {
                     />
                     <Metric
                       label="Tracked net worth"
-                      value={state.balances.length ? fmt(worth.total) : "—"}
+                      value={hasKnownWorth ? fmt(worth.total) : "—"}
                       caption={
                         worth.missing
                           ? `${worth.missing} account${worth.missing === 1 ? "" : "s"} missing a balance`
@@ -967,6 +1100,7 @@ export default function Home() {
                     onReview={() => {
                       setFilter("review");
                       setCatFilter("all");
+                      setAccountFilter("all");
                       setPage("Transactions");
                     }}
                     onBudget={() => setPage("Budgets")}
@@ -1069,9 +1203,11 @@ export default function Home() {
                                   </details>
                                   <small>
                                     {shortDate(t.date)} ·{" "}
-                                    {state.categories.find(
-                                      (c) => c.id === t.category,
-                                    )?.name || "No category"}
+                                    {hasSplits(state, t)
+                                      ? `Split · ${splitsFor(state, t.id).length} allocations`
+                                      : state.categories.find(
+                                          (c) => c.id === t.category,
+                                        )?.name || "No category"}
                                   </small>
                                 </div>
                                 <b
@@ -1113,7 +1249,7 @@ export default function Home() {
                 <section className="panel">
                   <PanelTitle
                     title="Your transactions"
-                    subtitle={`${filtered.length} matching records · ${periodLabel}`}
+                    subtitle={`${counted(filtered.length, "matching record")} · ${periodLabel}`}
                     right={
                       <div className="transaction-actions">
                         <Button
@@ -1133,11 +1269,31 @@ export default function Home() {
                       </div>
                     }
                   />
-                  <div className="filters">
+                  <TransactionViews
+                    state={state}
+                    current={{
+                      search,
+                      type: filter,
+                      category: catFilter,
+                      account: accountFilter,
+                      start,
+                      end,
+                    }}
+                    onApply={applyTransactionView}
+                    save={save}
+                    busy={busy}
+                    demo={demo}
+                    today={today()}
+                    Modal={Modal}
+                    Button={Button}
+                    Field={Field}
+                  />
+                  <div className="filters transaction-filters">
                     <div className="search">
                       <Search size={16} />
                       <input
                         aria-label="Search transactions"
+                        maxLength={500}
                         placeholder="Search a merchant or account…"
                         value={search}
                         onChange={(e) => {
@@ -1156,6 +1312,7 @@ export default function Home() {
                     >
                       <option value="all">All transaction types</option>
                       <option value="review">Needs review</option>
+                      <option value="reviewed">Reviewed</option>
                       {kinds.map((k) => (
                         <option key={k}>{k}</option>
                       ))}
@@ -1170,19 +1327,61 @@ export default function Home() {
                     >
                       <option value="all">All categories</option>
                       <option value="">No category</option>
+                      {catFilter !== "all" &&
+                        catFilter !== "" &&
+                        !state.categories.some((c) => c.id === catFilter) && (
+                          <option value={catFilter} disabled>
+                            Removed category · choose another
+                          </option>
+                        )}
                       {state.categories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {categoryLabel(state.categories, c.id)}
                         </option>
                       ))}
                     </select>
+                    <select
+                      aria-label="Filter account"
+                      value={accountFilter}
+                      onChange={(e) => {
+                        setAccountFilter(e.target.value);
+                        setTxPage(0);
+                      }}
+                    >
+                      <option value="all">All accounts</option>
+                      <option value="">No account</option>
+                      {accountFilter !== "all" &&
+                        accountFilter !== "" &&
+                        !state.accounts.some((a) => a.id === accountFilter) && (
+                          <option value={accountFilter} disabled>
+                            Removed account · choose another
+                          </option>
+                        )}
+                      {state.accounts.map((a) => (
+                        <option value={a.id} key={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   {filtered.length ? (
                     <>
-                      <div className="transaction-selection">
+                      <div
+                        className={`transaction-selection ${selectedTransactions.length ? "has-selection" : ""}`}
+                        role="toolbar"
+                        aria-label="Selected transaction actions"
+                      >
                         <label className="check-row">
                           <input
                             type="checkbox"
+                            ref={(node) => {
+                              if (node)
+                                node.indeterminate =
+                                  selectedTransactions.length > 0 &&
+                                  !filtered.every((t) =>
+                                    selectedTransactions.includes(t.id),
+                                  );
+                            }}
                             disabled={!!demo || busy}
                             checked={filtered.every((t) =>
                               selectedTransactions.includes(t.id),
@@ -1197,14 +1396,29 @@ export default function Home() {
                           />
                           Select all {filtered.length} matching transactions
                         </label>
-                        <span>{selectedTransactions.length} selected</span>
+                        <span aria-live="polite">
+                          {selectedTransactions.length} selected
+                        </span>
                         {selectedTransactions.length > 0 && (
-                          <>
+                          <div className="selection-actions">
                             <Button
                               disabled={busy}
                               onClick={() => setSelectedTransactions([])}
                             >
                               Clear
+                            </Button>
+                            <Button
+                              variant="primary"
+                              disabled={busy || !!demo}
+                              onClick={() =>
+                                setModal({
+                                  type: "bulk-transactions",
+                                  ids: [...selectedTransactions],
+                                })
+                              }
+                            >
+                              <Pencil size={15} />
+                              Edit selected
                             </Button>
                             <Button
                               variant="danger-button"
@@ -1219,7 +1433,7 @@ export default function Home() {
                               <Trash2 size={15} />
                               Delete selected
                             </Button>
-                          </>
+                          </div>
                         )}
                       </div>
                       <div className="table-scroll">
@@ -1280,18 +1494,11 @@ export default function Home() {
                                     </button>
                                   </td>
                                   <td>
-                                    <span className="category-tag">
-                                      <i
-                                        style={{
-                                          background: state.categories.find(
-                                            (c) => c.id === t.category,
-                                          )?.color,
-                                        }}
-                                      />
-                                      {state.categories.find(
-                                        (c) => c.id === t.category,
-                                      )?.name || "No category"}
-                                    </span>
+                                    <TransactionCategories
+                                      state={state}
+                                      transaction={t}
+                                      fmt={fmt}
+                                    />
                                   </td>
                                   <td>
                                     {state.accounts.find(
@@ -1305,9 +1512,27 @@ export default function Home() {
                                   </td>
                                   <td className="align-right number">
                                     {fmt(t.amount)}
+                                    {catFilter !== "all" &&
+                                      hasSplits(state, t) && (
+                                        <small>
+                                          {fmt(
+                                            categoryAmount(
+                                              state,
+                                              t,
+                                              new Set(
+                                                categoryIds(
+                                                  state.categories,
+                                                  catFilter,
+                                                ),
+                                              ),
+                                            ),
+                                          )}{" "}
+                                          in selected category
+                                        </small>
+                                      )}
                                   </td>
                                   <td>
-                                    {needsReview(t) ? (
+                                    {needsReview(t, state) ? (
                                       <button
                                         className="review-pill"
                                         disabled={!!demo}
@@ -1339,6 +1564,26 @@ export default function Home() {
                                     >
                                       <Pencil size={16} />
                                     </button>
+                                    {["expense", "refund"].includes(t.kind) && (
+                                      <button
+                                        className="icon-button"
+                                        disabled={!!demo || busy}
+                                        title={
+                                          hasSplits(state, t)
+                                            ? "Manage split"
+                                            : "Split transaction"
+                                        }
+                                        aria-label={`Split ${t.merchant || t.description} on ${t.date}`}
+                                        onClick={() =>
+                                          setModal({
+                                            type: "split-transaction",
+                                            transaction: t,
+                                          })
+                                        }
+                                      >
+                                        <Split size={16} />
+                                      </button>
+                                    )}
                                     <button
                                       className="icon-button"
                                       disabled={!!demo || busy}
@@ -1384,6 +1629,19 @@ export default function Home() {
                     </Empty>
                   )}
                 </section>
+              )}
+              {page === "Statements" && (
+                <StatementsPage
+                  state={state}
+                  start={start}
+                  end={end}
+                  save={save}
+                  busy={busy}
+                  demo={demo}
+                  Modal={Modal}
+                  Button={Button}
+                  Field={Field}
+                />
               )}
               {page === "Analysis" && (
                 <AnalysisPage
@@ -1526,28 +1784,20 @@ export default function Home() {
                   <div className="metrics three">
                     <Metric
                       label="Tracked net worth"
-                      value={state.balances.length ? fmt(worth.total) : "—"}
+                      value={hasKnownWorth ? fmt(worth.total) : "—"}
                       caption={worthCaption}
                       icon={Wallet}
                       accent
                     />
                     <Metric
                       label="Assets"
-                      value={fmt(
-                        worth.accounts
-                          .filter((a) => !["credit", "loan"].includes(a.type))
-                          .reduce((s, a) => s + (a.balance || 0), 0),
-                      )}
+                      value={balanceGroupValue(false)}
                       caption="Latest recorded asset balances"
                       icon={TrendingUp}
                     />
                     <Metric
                       label="Liabilities"
-                      value={fmt(
-                        worth.accounts
-                          .filter((a) => ["credit", "loan"].includes(a.type))
-                          .reduce((s, a) => s + (a.balance || 0), 0),
-                      )}
+                      value={balanceGroupValue(true)}
                       caption="Credit cards and loans owed"
                       icon={ArrowUpRight}
                     />
@@ -1585,9 +1835,25 @@ export default function Home() {
                           <span className="category-icon">
                             <Wallet size={20} />
                           </span>
-                          <span className="chip">{a.type}</span>
+                          <span className="chip">
+                            {accountTypeLabel(a.type)}
+                          </span>
                         </div>
                         <h3>{a.name}</h3>
+                        <button
+                          className="text-button"
+                          disabled={!!demo || busy}
+                          onClick={() =>
+                            setModal({
+                              type: "account",
+                              account: state.accounts.find(
+                                (x) => x.id === a.id,
+                              ),
+                            })
+                          }
+                        >
+                          <Pencil size={14} /> Edit account
+                        </button>
                         <h2>{a.balance === null ? "—" : fmt(a.balance)}</h2>
                         <p>
                           {a.date
@@ -1724,10 +1990,24 @@ export default function Home() {
                     setSearch("");
                     setFilter("all");
                     setCatFilter("all");
+                    setAccountFilter("all");
                     setTxPage(0);
                     setPage("Transactions");
                   }}
-                  reviewBalances={() => setPage("Accounts")}
+                  reviewBalances={() => {
+                    const dates = state.balances.map((b) => b.date).sort();
+                    setCustom({
+                      start: dates[0] || today(),
+                      end: dates.at(-1) || today(),
+                    });
+                    setPeriod("custom");
+                    setPage("Accounts");
+                  }}
+                  onOpened={opened}
+                  onRestored={restored}
+                  filteredIds={filtered.map((t) => t.id)}
+                  filteredCategory={catFilter}
+                  periodLabel={periodLabel}
                   openSetup={() => setSetupOpen(true)}
                 />
               )}
@@ -1792,7 +2072,13 @@ export default function Home() {
         <BudgetEditor state={state} save={save} busy={busy} onClose={close} />
       )}
       {modal?.type === "account" && (
-        <AccountModal state={state} save={save} busy={busy} onClose={close} />
+        <AccountModal
+          account={modal.account}
+          state={state}
+          save={save}
+          busy={busy}
+          onClose={close}
+        />
       )}
       {modal?.type === "balance" && (
         <BalanceModal
@@ -1801,6 +2087,19 @@ export default function Home() {
           save={save}
           busy={busy}
           onClose={close}
+        />
+      )}
+      {modal?.type === "bulk-transactions" && (
+        <BulkTransactionModal
+          key={modal.ids.join(",")}
+          state={state}
+          ids={modal.ids}
+          save={save}
+          busy={busy}
+          onClose={close}
+          Modal={Modal}
+          Button={Button}
+          Field={Field}
         />
       )}
       {modal?.type === "delete-transactions" && (
@@ -1829,12 +2128,7 @@ export default function Home() {
               onClick={async () => {
                 if (
                   await save(
-                    {
-                      ...state,
-                      transactions: state.transactions.filter(
-                        (t) => !modal.ids.includes(t.id),
-                      ),
-                    },
+                    deleteTransactions(state, modal.ids),
                     "Transactions deleted",
                   )
                 ) {
@@ -1849,6 +2143,18 @@ export default function Home() {
             </Button>
           </div>
         </Modal>
+      )}
+      {modal?.type === "split-transaction" && (
+        <SplitTransactionModal
+          {...modal}
+          state={state}
+          save={save}
+          busy={busy}
+          onClose={close}
+          Modal={Modal}
+          Button={Button}
+          Field={Field}
+        />
       )}
       {modal?.type === "transaction" && (
         <TransactionModal
@@ -2001,7 +2307,7 @@ function WorthChart({ state, start, end }) {
     });
     d.setMonth(d.getMonth() + 1);
   }
-  return state.balances.length ? (
+  return data.some((row) => row.NetWorth !== null) ? (
     <div className="chart">
       <ResponsiveContainer width="100%" height={260}>
         <AreaChart data={data}>
@@ -2023,12 +2329,19 @@ function WorthChart({ state, start, end }) {
             tickLine={false}
             width={60}
             tick={{ fontSize: 11, fill: "var(--muted)" }}
-            tickFormatter={(v) => `${v / 1000}k`}
+            tickFormatter={(v) =>
+              new Intl.NumberFormat("en-CA", {
+                style: "currency",
+                currency: state.currency,
+                notation: Math.abs(v) >= 10000 ? "compact" : "standard",
+                maximumFractionDigits: 0,
+              }).format(v)
+            }
           />
           <Tooltip
             {...chartTooltip}
             formatter={(v, name, p) => [
-              `${money(v * 100, state.currency)}${p.payload.missing ? ` (${p.payload.missing} missing accounts)` : ""}`,
+              `${money(v * 100, state.currency)}${p.payload.missing ? ` (${counted(p.payload.missing, "missing account")})` : ""}`,
               "Net worth",
             ]}
           />
@@ -2163,6 +2476,7 @@ function Insights({ summary, state, factor, fmt, onReview, onBudget }) {
 }
 function CategoriesPage({ state, demo, busy, save, open, fmt }) {
   const roots = state.categories.filter((c) => !c.parentId);
+  const [forgetting, setForgetting] = useState(null);
   return (
     <>
       <div className="section-heading">
@@ -2265,6 +2579,7 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
                 <tr>
                   <th>Merchant</th>
                   <th>Remembered category</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -2282,17 +2597,17 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
                         onChange={(e) =>
                           save(
                             {
-                              ...state,
-                              merchantRules: state.merchantRules.map((x) =>
-                                x.id === r.id
-                                  ? { ...x, category: e.target.value }
-                                  : x,
+                              ...setMerchantCategory(
+                                state,
+                                r.key,
+                                e.target.value,
                               ),
                             },
                             "Merchant category updated",
                           )
                         }
                       >
+                        <option value="uncategorized">Autofill off</option>
                         {state.categories
                           .filter((c) => c.id !== "uncategorized")
                           .map((c) => (
@@ -2301,6 +2616,18 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
                             </option>
                           ))}
                       </select>
+                    </td>
+                    <td>
+                      <button
+                        className="text-button"
+                        aria-label={`Forget category for ${r.merchant}`}
+                        disabled={
+                          busy || !!demo || r.category === "uncategorized"
+                        }
+                        onClick={() => setForgetting(r)}
+                      >
+                        <Trash2 size={14} /> Forget category
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -2315,6 +2642,41 @@ function CategoriesPage({ state, demo, busy, save, open, fmt }) {
           </p>
         )}
       </section>
+      {forgetting && (
+        <Modal
+          title={`Forget the category for ${forgetting.merchant}?`}
+          subtitle="Existing transactions keep their categories."
+          onClose={() => setForgetting(null)}
+        >
+          <div className="form-body">
+            <p>
+              Autofill will stop for this merchant, including learning from past
+              transactions. A local “Autofill off” preference is kept so it
+              stays forgotten. Choose a category in this table to resume.
+            </p>
+          </div>
+          <div className="dialog-actions">
+            <Button disabled={busy} onClick={() => setForgetting(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger-button"
+              disabled={busy || !!demo}
+              onClick={async () => {
+                if (
+                  await save(
+                    forgetMerchantCategory(state, forgetting.key),
+                    "Merchant category forgotten",
+                  )
+                )
+                  setForgetting(null);
+              }}
+            >
+              Forget category
+            </Button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -2579,7 +2941,9 @@ function BudgetEditor({ state, save, busy, onClose }) {
             </Field>
           ) : (
             <div className="budget-selection">
-              <span>{selected.length} categories selected</span>
+              <span>
+                {counted(selected.length, "category", "categories")} selected
+              </span>
               <Button
                 type="button"
                 onClick={() => setSelected(categories.map((c) => c.id))}
@@ -2683,6 +3047,191 @@ function BudgetEditor({ state, save, busy, onClose }) {
     </Modal>
   );
 }
+function RecordRemovalModal({
+  kind,
+  record,
+  state,
+  save,
+  busy,
+  onCancel,
+  onDeleted,
+}) {
+  const [replacement, setReplacement] = useState(
+      kind === "category" ? "uncategorized" : "",
+    ),
+    [deleteRecords, setDeleteRecords] = useState(false),
+    [confirmed, setConfirmed] = useState(false),
+    [error, setError] = useState("");
+  const transactions = state.transactions.filter((t) =>
+    kind === "category"
+      ? t.category === record.id ||
+        splitsFor(state, t.id).some((s) => s.category === record.id)
+      : t[kind] === record.id,
+  ).length;
+  const balances =
+    kind === "account"
+      ? state.balances.filter((b) => b.account === record.id).length
+      : 0;
+  const children =
+    kind === "category"
+      ? state.categories.filter((c) => c.parentId === record.id).length
+      : 0;
+  const linked = transactions + balances > 0;
+  return (
+    <Modal
+      title={`Delete ${kind}: ${record.name}?`}
+      subtitle="Review what happens to linked records before deleting."
+      onClose={onCancel}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!confirmed) {
+            setError("Confirm that you have reviewed these changes.");
+            return;
+          }
+          try {
+            const next =
+              kind === "account"
+                ? removeAccount(state, record.id, {
+                    destination: replacement,
+                    deleteRecords,
+                  })
+                : removeCategory(state, record.id, replacement);
+            if (
+              await save(
+                next,
+                `${kind === "account" ? "Account" : "Category"} deleted`,
+              )
+            )
+              onDeleted();
+          } catch (e) {
+            setError(e.message);
+          }
+        }}
+      >
+        <div className="form-body">
+          <p>
+            {counted(transactions, "transaction")}
+            {kind === "account"
+              ? ` and ${counted(balances, "balance snapshot")}`
+              : ""}{" "}
+            linked to this {kind}. A local backup is saved before deletion.
+          </p>
+          {kind === "category" ? (
+            <>
+              <Field label="Move transactions to">
+                <select
+                  value={replacement}
+                  onChange={(e) => setReplacement(e.target.value)}
+                >
+                  {state.categories
+                    .filter((c) => c.id !== record.id)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {categoryLabel(state.categories, c.id)}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <p>
+                Existing transactions are preserved. This category’s regular
+                budget and monthly adjustments are removed. Merchant rules move
+                to the selected category; Uncategorized turns their autofill
+                off.
+              </p>
+              {children > 0 && (
+                <p>
+                  {counted(children, "subcategory", "subcategories")} will
+                  become{" "}
+                  {children === 1
+                    ? "a top-level category"
+                    : "top-level categories"}
+                  , keeping their own budgets.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              {linked && (
+                <>
+                  <Field
+                    label="Move records to another account"
+                    hint="Balances with the same date cannot be combined automatically."
+                  >
+                    <select
+                      disabled={deleteRecords}
+                      value={replacement}
+                      onChange={(e) => {
+                        setReplacement(e.target.value);
+                        setError("");
+                      }}
+                    >
+                      <option value="">Choose an account</option>
+                      {state.accounts
+                        .filter((a) => a.id !== record.id)
+                        .map((a) => (
+                          <option value={a.id} key={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={deleteRecords}
+                      onChange={(e) => {
+                        setDeleteRecords(e.target.checked);
+                        setReplacement("");
+                        setConfirmed(false);
+                      }}
+                    />{" "}
+                    Delete the linked transactions and balance snapshots instead
+                    of moving them.
+                  </label>
+                </>
+              )}
+              <p>
+                The account’s saved import settings are removed. Other accounts
+                and their records stay unchanged.
+              </p>
+            </>
+          )}
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />{" "}
+            I have reviewed these changes and want to delete this {kind}.
+          </label>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="dialog-actions">
+          <Button type="button" disabled={busy} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger-button"
+            disabled={
+              busy ||
+              !confirmed ||
+              (kind === "account" && linked && !replacement && !deleteRecords)
+            }
+          >
+            Delete {kind}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function CategoryModal({
   category,
   state,
@@ -2700,6 +3249,7 @@ function CategoryModal({
     [parentId, setParentId] = useState(category?.parentId || initialParent),
     [scope, setScope] = useState(category?.budgetScope || "separate"),
     [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const hasChildren = state.categories.some((c) => c.parentId === category?.id),
     parent = state.categories.find((c) => c.id === parentId);
   async function submit(e) {
@@ -2737,6 +3287,18 @@ function CategoryModal({
       setError(e.message);
     }
   }
+  if (deleting)
+    return (
+      <RecordRemovalModal
+        kind="category"
+        record={category}
+        state={state}
+        save={save}
+        busy={busy}
+        onCancel={() => setDeleting(false)}
+        onDeleted={onClose}
+      />
+    );
   return (
     <Modal
       title={
@@ -2832,6 +3394,16 @@ function CategoryModal({
           {error && <p className="error">{error}</p>}
         </div>
         <div className="dialog-actions">
+          {category && category.id !== "uncategorized" && (
+            <Button
+              type="button"
+              variant="danger-button"
+              disabled={busy}
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 size={14} /> Delete category
+            </Button>
+          )}
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
@@ -2843,28 +3415,50 @@ function CategoryModal({
     </Modal>
   );
 }
-function AccountModal({ state, save, busy, onClose }) {
-  const [name, setName] = useState(""),
-    [type, setType] = useState("bank");
+function AccountModal({ account, state, save, busy, onClose }) {
+  const [name, setName] = useState(account?.name || ""),
+    [type, setType] = useState(account?.type || "bank"),
+    [deleting, setDeleting] = useState(false),
+    [error, setError] = useState("");
+  if (deleting)
+    return (
+      <RecordRemovalModal
+        kind="account"
+        record={account}
+        state={state}
+        save={save}
+        busy={busy}
+        onCancel={() => setDeleting(false)}
+        onDeleted={onClose}
+      />
+    );
   return (
     <Modal
-      title="Add an account"
+      title={account ? "Edit account" : "Add an account"}
       subtitle="Just a name and type. No bank connection needed."
       onClose={onClose}
     >
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (
-            await save({
-              ...state,
-              accounts: [
-                ...state.accounts,
-                { id: uid(), name: name.trim(), type },
-              ],
-            })
-          )
-            onClose();
+          if (!name.trim()) {
+            setError("Enter an account name.");
+            return;
+          }
+          try {
+            const next = account
+              ? editAccount(state, account.id, name, type)
+              : {
+                  ...state,
+                  accounts: [
+                    ...state.accounts,
+                    { id: uid(), name: name.trim(), type },
+                  ],
+                };
+            if (await save(next)) onClose();
+          } catch (error) {
+            setError(error.message);
+          }
         }}
       >
         <div className="form-body">
@@ -2879,27 +3473,43 @@ function AccountModal({ state, save, busy, onClose }) {
           </Field>
           <Field label="Account type">
             <select value={type} onChange={(e) => setType(e.target.value)}>
-              {[
-                ["bank", "Chequing / debit"],
-                ["savings", "Savings"],
-                ["credit", "Credit card"],
-                ["investment", "Investment"],
-                ["loan", "Loan"],
-                ["cash", "Cash"],
-              ].map(([v, l]) => (
+              {accountTypes.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>
               ))}
             </select>
           </Field>
+          {account && type !== account.type && (
+            <p className="notice">
+              Changing account type changes how its balances count toward net
+              worth. Amounts and transaction types stay unchanged.
+              {(account.type === "credit") !== (type === "credit") &&
+                " Saved CSV mappings are reset when switching between credit-card and other statement types."}
+            </p>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
         </div>
         <div className="dialog-actions">
+          {account && (
+            <Button
+              type="button"
+              variant="danger-button"
+              disabled={busy}
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 size={14} /> Delete account
+            </Button>
+          )}
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="primary" disabled={busy}>
-            Add account
+            {account ? "Save account" : "Add account"}
           </Button>
         </div>
       </form>
@@ -3052,13 +3662,14 @@ function MerchantGroupFields({
   onChange,
   disabled = false,
 }) {
-  const groups = merchantGroups(transactions);
+  const groups = merchantGroups(transactions, state);
   return (
     <div className="merchant-group-fields">
       <p className="form-note">
         Choose once per merchant. This applies to every included purchase and
         refund in that group, including previously assigned categories.
-        Individual records remain separate.
+        Individual records remain separate. Split transactions are excluded to
+        protect their allocations.
       </p>
       {groups.length ? (
         groups.map((g) => (
@@ -3110,7 +3721,7 @@ function MerchantGroupFields({
 function MerchantGroupModal({ state, save, busy, onClose, transactions }) {
   const [choices, setChoices] = useState({});
   const preview = Object.entries(choices).reduce(
-    (rows, [key, cat]) => applyGroupCategory(rows, key, cat),
+    (rows, [key, cat]) => applyGroupCategory(rows, key, cat, state),
     transactions,
   );
   return (
@@ -3136,7 +3747,7 @@ function MerchantGroupModal({ state, save, busy, onClose, transactions }) {
             const ids = new Set(transactions.map((t) => t.id));
             let next = state;
             const changed = Object.entries(choices).reduce(
-              (rows, [key, cat]) => applyGroupCategory(rows, key, cat),
+              (rows, [key, cat]) => applyGroupCategory(rows, key, cat, state),
               transactions,
             );
             for (const t of changed)
@@ -3160,6 +3771,36 @@ function MerchantGroupModal({ state, save, busy, onClose, transactions }) {
         </Button>
       </div>
     </Modal>
+  );
+}
+function TransactionCategories({ state, transaction: t, fmt }) {
+  const rows = splitsFor(state, t.id);
+  if (!rows.length)
+    return (
+      <span className="category-tag">
+        <i
+          style={{
+            background: state.categories.find((c) => c.id === t.category)
+              ?.color,
+          }}
+        />
+        {state.categories.find((c) => c.id === t.category)?.name ||
+          "No category"}
+      </span>
+    );
+  return (
+    <details className="transaction-split-details">
+      <summary>Split · {rows.length} allocations</summary>
+      <ul>
+        {rows.map((s) => (
+          <li key={s.id}>
+            <strong>{categoryLabel(state.categories, s.category)}</strong>
+            <span>{fmt(s.amount)}</span>
+            {s.note && <small>{s.note}</small>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 function TransactionModal({
@@ -3195,6 +3836,22 @@ function TransactionModal({
       !!t && t.category !== "uncategorized",
     ),
     [applyExisting, setApplyExisting] = useState(true);
+  const [splitEnabled, setSplitEnabled] = useState(!!t && hasSplits(state, t));
+  const [splitMode, setSplitMode] = useState("amount");
+  const [splitRows, setSplitRows] = useState(() =>
+    t
+      ? splitsFor(state, t.id).map((s) => ({
+          ...s,
+          value: (s.amount / 100).toFixed(2),
+        }))
+      : [],
+  );
+  let allocationTotal = 0;
+  try {
+    allocationTotal = cents(form.amount) || 0;
+  } catch {}
+  const splitOver =
+    splitEnabled && splitBalance(allocationTotal, splitRows, splitMode).over;
   const errorRef = useRef(null);
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ block: "nearest" });
@@ -3252,6 +3909,7 @@ function TransactionModal({
           try {
             if (
               needsCategory &&
+              !splitEnabled &&
               (!form.category ||
                 form.category === "uncategorized" ||
                 !state.categories.some((c) => c.id === form.category))
@@ -3271,16 +3929,25 @@ function TransactionModal({
             const next = {
               ...transactionDetails(form),
               amount,
-              category: needsCategory ? form.category : "",
+              category: needsCategory && !splitEnabled ? form.category : "",
               id: t?.id || uid(),
               source: "reviewed",
               review: false,
             };
-            let learnedState = rememberCategory(state, next);
+            const allocations = splitEnabled
+              ? draftSplits(amount, splitRows, splitMode, state.categories)
+              : [];
+            let learnedState = setTransactionSplits(
+              state,
+              next.id,
+              allocations,
+            );
+            if (!splitEnabled)
+              learnedState = rememberCategory(learnedState, next);
             let transactions = t
               ? state.transactions.map((x) => (x.id === t.id ? next : x))
               : [...state.transactions, next];
-            if (applyExisting)
+            if (applyExisting && !splitEnabled)
               transactions = transactions.map((x) =>
                 merchantGroupKey(x) === merchantGroupKey(next)
                   ? localCategorize([x], learnedState)[0]
@@ -3314,7 +3981,12 @@ function TransactionModal({
               onChange={(e) => field("kind", e.target.value)}
             >
               {kinds.map((k) => (
-                <option key={k}>{k}</option>
+                <option
+                  key={k}
+                  disabled={splitEnabled && !["expense", "refund"].includes(k)}
+                >
+                  {k}
+                </option>
               ))}
             </select>
           </Field>
@@ -3375,6 +4047,71 @@ function TransactionModal({
             </Field>
           )}
           {needsCategory && (
+            <div className="split-toggle">
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!splitEnabled && !splitRows.length)
+                    setSplitRows([
+                      {
+                        id: uid(),
+                        category:
+                          form.category === "uncategorized"
+                            ? ""
+                            : form.category,
+                        value: form.amount,
+                        note: "",
+                      },
+                      { id: uid(), category: "", value: "", note: "" },
+                    ]);
+                  setSplitEnabled(!splitEnabled);
+                }}
+              >
+                {splitEnabled
+                  ? "Use one category instead"
+                  : "Split across categories"}
+              </Button>
+              {splitEnabled && (
+                <p className="form-note">
+                  Remove the split before changing to income or transfer. Saving
+                  as one category will remove the allocations and assign the
+                  full total to your chosen category.
+                </p>
+              )}
+              {!splitEnabled && !!t && hasSplits(state, t) && (
+                <p className="notice">
+                  Saving will remove this transaction’s split. Choose one
+                  category for its full amount, or cancel to keep the split.
+                </p>
+              )}
+            </div>
+          )}
+          {needsCategory && splitEnabled && (
+            <SplitEditor
+              rows={splitRows}
+              setRows={(rows) => {
+                setSplitRows(rows);
+                setError("");
+              }}
+              mode={splitMode}
+              setMode={(mode) => {
+                setSplitMode(mode);
+                setError("");
+              }}
+              total={(() => {
+                try {
+                  return cents(form.amount) || 0;
+                } catch {
+                  return 0;
+                }
+              })()}
+              currency={state.currency}
+              categories={state.categories}
+              Button={Button}
+              Field={Field}
+            />
+          )}
+          {needsCategory && !splitEnabled && (
             <Field
               label="Category"
               hint={
@@ -3420,6 +4157,7 @@ function TransactionModal({
             </Field>
           )}
           {needsCategory &&
+            !splitEnabled &&
             form.category &&
             form.category !== "uncategorized" && (
               <p className="form-note">
@@ -3454,6 +4192,7 @@ function TransactionModal({
             </Field>
           </div>
           {["expense", "refund"].includes(form.kind) &&
+            !splitEnabled &&
             form.category &&
             form.category !== "uncategorized" && (
               <label className="check-row">
@@ -3479,12 +4218,7 @@ function TransactionModal({
                 }
                 if (
                   await save(
-                    {
-                      ...state,
-                      transactions: state.transactions.filter(
-                        (x) => x.id !== t.id,
-                      ),
-                    },
+                    deleteTransactions(state, [t.id]),
                     "Transaction deleted successfully.",
                     setError,
                   )
@@ -3499,8 +4233,9 @@ function TransactionModal({
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={busy}>
-            {["expense", "refund"].includes(form.kind) &&
+          <Button variant="primary" disabled={busy || splitOver}>
+            {!splitEnabled &&
+            ["expense", "refund"].includes(form.kind) &&
             form.category &&
             form.category !== "uncategorized"
               ? "Save & remember"
@@ -3523,6 +4258,11 @@ function SettingsPage({
   reviewTransactions,
   reviewBalances,
   openSetup,
+  onRestored,
+  onOpened,
+  filteredIds,
+  filteredCategory,
+  periodLabel,
 }) {
   const [displayName, setDisplayName] = useState(state.displayName || "");
   const [currency, setCurrency] = useState(state.currency),
@@ -3531,8 +4271,10 @@ function SettingsPage({
     [working, setWorking] = useState(false),
     [themeOpen, setThemeOpen] = useState(false),
     [vaultOpen, setVaultOpen] = useState(false),
+    [existingVaultOpen, setExistingVaultOpen] = useState(false),
     [vaultPath, setVaultPath] = useState(meta.vaultPath || ""),
     [vaultError, setVaultError] = useState("");
+  const folderPicker = useFolderPicker(api, setVaultPath, setVaultError);
   const locked = !!(state.transactions.length || state.balances.length);
   const disabled = busy || working || !!demo;
   const selectedTheme = themes.find((t) => t.id === state.theme) || themes[0];
@@ -3616,7 +4358,7 @@ function SettingsPage({
             <h3>Currency</h3>
             <p>
               {locked
-                ? `${state.transactions.length} transactions and ${state.balances.length} balance snapshots remain across all dates. Currency stays locked until these records are removed; changing a label would not convert their amounts.`
+                ? `${counted(state.transactions.length, "transaction")} and ${counted(state.balances.length, "balance snapshot")} remain across all dates. Currency stays locked until these records are removed; changing a label would not convert their amounts.`
                 : "One currency for all accounts. Amounts are not converted."}
             </p>
             <span className="status-label">
@@ -3833,10 +4575,27 @@ function SettingsPage({
         </div>
         <div className="settings-row">
           <div>
+            <h3>Returning after a reinstall?</h3>
+            <p>
+              Open the same vault folder to load its accounts, transactions,
+              budgets, balances, and preferences. Existing files stay in place.
+            </p>
+          </div>
+          <Button
+            disabled={disabled}
+            onClick={() => setExistingVaultOpen(true)}
+          >
+            <FolderOpen size={16} />
+            Open existing vault
+          </Button>
+        </div>
+        <div className="settings-row">
+          <div>
             <h3>Automatic backups</h3>
             <p>
-              The latest 30 snapshots are kept in the vault’s .backups folder.
-              Every save is recoverable after interruptions.
+              Before each save, Clarity keeps a snapshot of your financial
+              Markdown files. The latest 30 automatic snapshots are retained.
+              Use Data & recovery below to preview or restore them.
             </p>
           </div>
           <span className="status-label connected">Always on</span>
@@ -3850,6 +4609,20 @@ function SettingsPage({
           </p>
         </details>
       </section>
+      <RecoveryPanel
+        api={api}
+        meta={meta}
+        onMeta={(info) => setMeta((m) => ({ ...m, ...info }))}
+        onRestored={onRestored}
+        busy={busy || !!demo}
+        onWorking={setWorking}
+        filteredIds={filteredIds}
+        filteredCategory={filteredCategory}
+        periodLabel={periodLabel}
+        Modal={Modal}
+        Button={Button}
+        Field={Field}
+      />
       {themeOpen && (
         <Modal
           title="Choose your theme"
@@ -3889,17 +4662,29 @@ function SettingsPage({
           </div>
         </Modal>
       )}
+      {existingVaultOpen && (
+        <OpenVaultDialog
+          api={api}
+          meta={meta}
+          onOpened={onOpened}
+          onClose={() => setExistingVaultOpen(false)}
+        />
+      )}
       {vaultOpen && (
         <Modal
           title="Move your vault"
           subtitle="All existing files move together. No records are reset."
           onClose={() => {
-            if (!working) setVaultOpen(false);
+            if (!working) {
+              folderPicker.cancel();
+              setVaultOpen(false);
+            }
           }}
         >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              folderPicker.cancel();
               setWorking(true);
               setVaultError("");
               try {
@@ -3923,23 +4708,21 @@ function SettingsPage({
             <div className="dialog-body">
               <Button
                 type="button"
-                disabled={working || meta.folderPickerAvailable === false}
-                onClick={async () => {
-                  setWorking(true);
-                  setVaultError("");
-                  try {
-                    const result = await api("vault/pick", {});
-                    if (result.path) setVaultPath(result.path);
-                  } catch (e) {
-                    setVaultError(e.message);
-                  } finally {
-                    setWorking(false);
-                  }
-                }}
+                disabled={
+                  working ||
+                  folderPicker.picking ||
+                  meta.folderPickerAvailable === false
+                }
+                onClick={folderPicker.pick}
               >
                 <FolderOpen size={18} />
-                {working ? "Choosing folder…" : "Choose folder…"}
+                {folderPicker.picking ? "Choosing folder…" : "Choose folder…"}
               </Button>
+              {folderPicker.picking && (
+                <Button type="button" onClick={folderPicker.cancel}>
+                  Cancel folder picker
+                </Button>
+              )}
               <p className="form-note">
                 {meta.platform === "server"
                   ? "Enter a new or empty folder path on the server. Your browser cannot select a folder on another computer."
@@ -3971,7 +4754,10 @@ function SettingsPage({
               <Button
                 type="button"
                 disabled={working}
-                onClick={() => setVaultOpen(false)}
+                onClick={() => {
+                  folderPicker.cancel();
+                  setVaultOpen(false);
+                }}
               >
                 Cancel
               </Button>
@@ -4028,6 +4814,10 @@ function ImportModal({
     [page, setPage] = useState(0),
     [needsEdit, setNeedsEdit] = useState(false);
   const [draftRules, setDraftRules] = useState([]);
+  const [statementStart, setStatementStart] = useState("");
+  const [statementEnd, setStatementEnd] = useState("");
+  const [coverageConfirmed, setCoverageConfirmed] = useState(false);
+  const [fileHash, setFileHash] = useState("");
   const savedProfile = profileFor(state, accountId);
   function applySaved(id, raw = text) {
     setAccountId(id);
@@ -4035,6 +4825,15 @@ function ImportModal({
     setNeedsEdit(false);
     const p = profileFor(state, id);
     const a = state.accounts.find((a) => a.id === id);
+    if (id === "new") {
+      setAccountType(statement === "credit" ? "credit" : "bank");
+      setMapping(mappingDefaults(statement === "credit" ? "credit" : "bank"));
+      setDelimiter(",");
+      setHeader(1);
+      setCurrencyConfirmed(false);
+      setSkipInvalid(false);
+      return;
+    }
     setStatement(p?.statement || (a?.type === "credit" ? "credit" : "bank"));
     setCurrencyConfirmed(!!p);
     setSkipInvalid(false);
@@ -4068,7 +4867,10 @@ function ImportModal({
     accountId === "new"
       ? { id: "pending", name: accountName.trim(), type: accountType }
       : state.accounts.find((a) => a.id === accountId);
-  const change = (k, v) => setMapping((m) => ({ ...m, [k]: v }));
+  const change = (k, v) => {
+    setError("");
+    setMapping((m) => ({ ...m, [k]: v }));
+  };
   async function readFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -4078,6 +4880,18 @@ function ImportModal({
     }
     const raw = await f.text();
     setFile(f);
+    setStatementStart("");
+    setStatementEnd("");
+    setCoverageConfirmed(false);
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(raw),
+    );
+    setFileHash(
+      Array.from(new Uint8Array(digest))
+        .map((n) => n.toString(16).padStart(2, "0"))
+        .join(""),
+    );
     setText(raw);
     setError("");
     if (savedProfile) {
@@ -4147,6 +4961,11 @@ function ImportModal({
       );
       if (parsed.dateInference?.format)
         setMapping((m) => ({ ...m, dateFormat: parsed.dateInference.format }));
+      const dates = parsed.transactions.map((t) => t.date).sort();
+      // These are suggestions only; purchase dates never prove full statement coverage.
+      setStatementStart(dates[0] || "");
+      setStatementEnd(dates.at(-1) || "");
+      setCoverageConfirmed(false);
       setPreview(parsed);
       setPage(0);
       setStep(3);
@@ -4198,6 +5017,8 @@ function ImportModal({
       ...preview.transactions.find((t) => t.id === id),
       ...patch,
     };
+    if (!["expense", "refund"].includes(selected.kind)) selected.category = "";
+    else if (!selected.category) selected.category = "uncategorized";
     const shouldLearn =
       patch.source === "reviewed" &&
       selected.category !== "uncategorized" &&
@@ -4237,20 +5058,60 @@ function ImportModal({
       return;
     }
     const selected = preview.transactions.filter((t) => !t.skip);
-    if (!selected.length) {
-      setError("No new transactions selected.");
+    if (!preview.transactions.length) {
+      setError(
+        "No readable transactions. Correct the mapping before recording this statement.",
+      );
       return;
     }
     const newAccount =
       accountId === "new" ? { ...account, id: uid() } : account;
     const imported = selected.map(({ row, duplicate, skip, ...t }) => ({
       ...t,
+      category: ["expense", "refund"].includes(t.kind) ? t.category : "",
       account: newAccount.id,
     }));
+    let importedState;
+    try {
+      const hash = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+        ),
+      )
+        .map((n) => n.toString(16).padStart(2, "0"))
+        .join("");
+      setFileHash(hash);
+      importedState = recordImport(state, {
+        transactions: imported,
+        complete: coverageConfirmed,
+        batch: {
+          id: uid(),
+          account: newAccount.id,
+          accountName: newAccount.name,
+          filename: file.name,
+          hash,
+          createdAt: new Date().toISOString(),
+          start: statementStart,
+          end: statementEnd,
+          duplicates: preview.transactions.filter((t) => t.duplicate && t.skip)
+            .length,
+          skipped: preview.transactions.filter((t) => !t.duplicate && t.skip)
+            .length,
+          invalid: preview.errors.length,
+          warnings: preview.errors
+            .slice(0, 30)
+            .map((e) => `Row ${e.row}: ${e.message}`)
+            .join("\n"),
+        },
+      });
+    } catch (e) {
+      setError(e.message);
+      return;
+    }
     if (
       await save(
         {
-          ...state,
+          ...importedState,
           accounts:
             accountId === "new"
               ? [...state.accounts, newAccount]
@@ -4283,11 +5144,12 @@ function ImportModal({
             ),
           ],
         },
-        `${imported.length} transactions saved to your vault`,
+        `${counted(imported.length, "transaction")} saved; statement history recorded`,
+        setError,
       )
     ) {
       onImported(
-        imported
+        preview.transactions
           .map((t) => t.date)
           .sort()
           .at(-1),
@@ -4426,13 +5288,19 @@ function ImportModal({
                   min="1"
                   max={Math.max(rows.length, 100000)}
                   value={header}
-                  onChange={(e) => setHeader(Math.max(1, +e.target.value))}
+                  onChange={(e) => {
+                    setError("");
+                    setHeader(Math.max(1, +e.target.value));
+                  }}
                 />
               </Field>
               <Field label="Column separator">
                 <select
                   value={delimiter}
-                  onChange={(e) => setDelimiter(e.target.value)}
+                  onChange={(e) => {
+                    setError("");
+                    setDelimiter(e.target.value);
+                  }}
                 >
                   <option value=",">Comma (,)</option>
                   <option value=";">Semicolon (;)</option>
@@ -4638,6 +5506,72 @@ function ImportModal({
         )}
         {step === 3 && preview && (
           <>
+            <section className="statement-period">
+              {(state.importBatches || []).some(
+                (b) => b.account === accountId && b.hash === fileHash,
+              ) && (
+                <p className="notice">
+                  This file has been recorded for this account before. Check the
+                  duplicate selections below. Recording it again adds history;
+                  only selected rows create transactions.
+                </p>
+              )}
+              <h3>What period does this statement cover?</h3>
+              <p>
+                Dates below start at the first and last readable transaction.
+                Check your statement and enter its actual coverage dates,
+                including days without purchases.
+              </p>
+              <div className="form-grid">
+                <Field label="Statement start">
+                  <input
+                    type="date"
+                    required
+                    value={statementStart}
+                    onChange={(e) => {
+                      setStatementStart(e.target.value);
+                      setCoverageConfirmed(false);
+                    }}
+                  />
+                </Field>
+                <Field label="Statement end">
+                  <input
+                    type="date"
+                    required
+                    value={statementEnd}
+                    onChange={(e) => {
+                      setStatementEnd(e.target.value);
+                      setCoverageConfirmed(false);
+                    }}
+                  />
+                </Field>
+              </div>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={coverageConfirmed}
+                  disabled={
+                    preview.errors.length > 0 ||
+                    preview.transactions.some((t) => t.skip && !t.duplicate)
+                  }
+                  onChange={(e) => setCoverageConfirmed(e.target.checked)}
+                />
+                I confirm this file covers the entire period for this account.
+              </label>
+              {(preview.errors.length > 0 ||
+                preview.transactions.some((t) => t.skip && !t.duplicate)) && (
+                <p className="notice">
+                  Coverage will be partial because some rows are excluded. You
+                  can confirm completeness later after correcting missing
+                  records.
+                </p>
+              )}
+              <p className="form-note">
+                History stores the filename, file fingerprint, counts, and
+                original transaction snapshots locally. The CSV file itself is
+                not copied to your vault.
+              </p>
+            </section>
             {preview.dateInference?.format && (
               <p className="notice">
                 Detected{" "}
@@ -4657,13 +5591,16 @@ function ImportModal({
             <div className="review-summary">
               <div>
                 <h3>
-                  {preview.transactions.filter((t) => !t.skip).length}{" "}
-                  transactions selected
+                  {counted(
+                    preview.transactions.filter((t) => !t.skip).length,
+                    "transaction",
+                  )}{" "}
+                  selected
                 </h3>
                 <p>
                   {preview.transactions.filter((t) => t.duplicate).length}{" "}
                   possible duplicates skipped by default ·{" "}
-                  {preview.errors.length} invalid rows
+                  {counted(preview.errors.length, "invalid row")}
                 </p>
               </div>
               {aiReady &&
@@ -4808,23 +5745,27 @@ function ImportModal({
                           </select>
                         </td>
                         <td>
-                          <select
-                            aria-label={`Category for row ${t.row}`}
-                            value={t.category}
-                            onChange={(e) =>
-                              update(t.id, {
-                                category: e.target.value,
-                                review: false,
-                                source: "reviewed",
-                              })
-                            }
-                          >
-                            {state.categories.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {categoryLabel(state.categories, c.id)}
-                              </option>
-                            ))}
-                          </select>
+                          {["expense", "refund"].includes(t.kind) ? (
+                            <select
+                              aria-label={`Category for row ${t.row}`}
+                              value={t.category}
+                              onChange={(e) =>
+                                update(t.id, {
+                                  category: e.target.value,
+                                  review: false,
+                                  source: "reviewed",
+                                })
+                              }
+                            >
+                              {state.categories.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {categoryLabel(state.categories, c.id)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="muted">No category</span>
+                          )}
                         </td>
                         <td>
                           {t.duplicate ? (
@@ -4954,12 +5895,20 @@ function ImportModal({
           <Button
             variant="primary"
             disabled={
-              busy || aiBusy || !preview?.transactions.some((t) => !t.skip)
+              busy ||
+              aiBusy ||
+              !preview?.transactions.length ||
+              !statementStart ||
+              !statementEnd
             }
             onClick={commit}
           >
             <Check size={16} />
-            {busy ? "Saving…" : "Import selected"}
+            {busy
+              ? "Saving…"
+              : preview?.transactions.some((t) => !t.skip)
+                ? "Import selected"
+                : "Record statement only"}
           </Button>
         )}
       </div>

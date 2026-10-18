@@ -1,5 +1,7 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { access, cp } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { readLocalSettings } from "../lib/local-settings.mjs";
 const configDir = path.resolve(process.env.CLARITY_CONFIG_DIR || process.cwd());
 const settings = await readLocalSettings(configDir);
@@ -20,18 +22,29 @@ if (
   );
 if (env.CLARITY_ORIGIN && !env.CLARITY_PASSWORD)
   throw Error("Set CLARITY_PASSWORD when configuring a server origin.");
-const child = spawn(
-  process.execPath,
-  [
-    "node_modules/next/dist/bin/next",
-    "start",
-    "--hostname",
-    host,
-    "--port",
-    port,
-  ],
-  { stdio: "inherit", env: { ...env, PORT: port } },
-);
+const project = fileURLToPath(new URL("../", import.meta.url));
+const runtime = path.join(project, ".next/standalone");
+const server = path.join(runtime, "server.js");
+await access(server).catch(() => {
+  throw Error("Build Clarity first with npm run build, then start it again.");
+});
+// The standalone server needs the same public/static assets as a deployment.
+await Promise.all([
+  cp(path.join(project, "public"), path.join(runtime, "public"), {
+    recursive: true,
+  }),
+  cp(path.join(project, ".next/static"), path.join(runtime, ".next/static"), {
+    recursive: true,
+  }),
+]);
+const child = spawn(process.execPath, [server], {
+  stdio: "inherit",
+  env: { ...env, HOSTNAME: host, PORT: port },
+});
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => child.kill(signal));
-child.on("exit", (code) => process.exit(code || 0));
+child.on("error", (error) => {
+  console.error(error.message);
+  process.exit(1);
+});
+child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

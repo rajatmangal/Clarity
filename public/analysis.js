@@ -1,3 +1,4 @@
+import { categoryTransactions } from "./transaction-splits.js";
 import { monthSlices, budgetPlan, monthCategories } from "./budget-plan.js";
 import {
   plannedBudget,
@@ -14,10 +15,9 @@ export function analysisData(state, start, end, trendStart, category = "all") {
       ? null
       : new Set(categoryIds(state.categories, category));
   const scoped = (t) => !ids || ids.has(t.category);
-  const all = state.transactions.filter(
-    (t) => t.date >= trendStart && t.date <= end,
-  );
-  const current = state.transactions.filter(
+  const allocated = categoryTransactions(state);
+  const all = allocated.filter((t) => t.date >= trendStart && t.date <= end);
+  const current = allocated.filter(
     (t) => t.date >= start && t.date <= end && scoped(t),
   );
   const parent = state.categories.find((c) => c.id === category);
@@ -54,7 +54,7 @@ export function analysisData(state, start, end, trendStart, category = "all") {
       Surplus: (income - totalSpent) / 100,
       Selected: spend / 100,
       Budget: budget / 100,
-      records: tx.length,
+      records: new Set(tx.map((t) => t.parentTransaction || t.id)).size,
       rootAmounts,
     };
   });
@@ -92,7 +92,7 @@ export function analysisData(state, start, end, trendStart, category = "all") {
         id: c.id,
         name: categoryLabel(state.categories, c.id),
         Spending:
-          state.transactions
+          allocated
             .filter(
               (t) =>
                 t.date >= start && t.date <= end && included.has(t.category),
@@ -112,12 +112,15 @@ export function analysisData(state, start, end, trendStart, category = "all") {
       name: detail.merchant,
       Spending: 0,
       purchases: 0,
+      purchaseIds: new Set(),
     };
     row.Spending += net(t) / 100;
-    if (t.kind === "expense") row.purchases++;
+    if (t.kind === "expense") row.purchaseIds.add(t.parentTransaction || t.id);
+    row.purchases = row.purchaseIds.size;
     merchantMap.set(key, row);
   }
   const merchants = [...merchantMap.values()]
+    .map(({ purchaseIds, ...row }) => row)
     .sort((a, b) => b.Spending - a.Spending)
     .filter((m) => m.Spending > 0)
     .slice(0, 10);
@@ -137,11 +140,18 @@ export function analysisData(state, start, end, trendStart, category = "all") {
     day.setUTCDate(day.getUTCDate() + 1);
   }
   const purchases = current.filter((t) => t.kind === "expense");
-  const missing = current.filter(
-    (t) =>
-      ["expense", "refund"].includes(t.kind) &&
-      (!t.category || t.category === "uncategorized"),
-  ).length;
+  const purchaseCount = new Set(
+    purchases.map((t) => t.parentTransaction || t.id),
+  ).size;
+  const missing = new Set(
+    current
+      .filter(
+        (t) =>
+          ["expense", "refund"].includes(t.kind) &&
+          (!t.category || t.category === "uncategorized"),
+      )
+      .map((t) => t.parentTransaction || t.id),
+  ).size;
   return {
     months,
     roots,
@@ -149,14 +159,12 @@ export function analysisData(state, start, end, trendStart, category = "all") {
     budgets,
     merchants,
     daily,
-    purchases: purchases.length,
-    average: purchases.length
-      ? Math.round(
-          purchases.reduce((n, t) => n + t.amount, 0) / purchases.length,
-        )
+    purchases: purchaseCount,
+    average: purchaseCount
+      ? Math.round(purchases.reduce((n, t) => n + t.amount, 0) / purchaseCount)
       : 0,
     missing,
     net: current.reduce((n, t) => n + net(t), 0),
-    records: current.length,
+    records: new Set(current.map((t) => t.parentTransaction || t.id)).size,
   };
 }

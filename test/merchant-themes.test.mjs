@@ -19,7 +19,7 @@ test('explicit choices teach new imports without overwriting manual categories o
  const state=rememberCategory(emptyState(),purchase('COFFEE SHOP #1425 VANCOUVER BC','dining'));
  const raw='Coffee Shop 9876 TORONTO ON';
  const [learned,manual,income]=applyMerchantLearning([purchase(raw),purchase(raw,'groceries'),{...purchase(raw),kind:'income'}],state);
- assert.equal(learned.category,'dining');assert.equal(learned.description,raw);assert.equal(learned.location,'TORONTO ON');assert.equal(learned.source,'learned');assert.equal(manual.category,'groceries');assert.equal(income.category,'uncategorized');
+ assert.equal(learned.category,'dining');assert.equal(learned.description,raw);assert.equal(learned.location,'TORONTO ON');assert.equal(learned.source,'learned');assert.equal(manual.category,'groceries');assert.equal(income.category,'');
  const corrected=rememberCategory(state,purchase(raw,'groceries'));assert.equal(corrected.merchantRules.length,1);assert.equal(applyMerchantLearning([purchase(raw)],corrected)[0].category,'groceries');
 });
 test('conflicting history and different merchants stay uncategorized',()=>{

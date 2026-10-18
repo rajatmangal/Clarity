@@ -204,9 +204,19 @@ async function start() {
           await fs.rename(tmp, keyFile);
         }
         value = true;
+      } else if (message.action === "open-backups") {
+        if (
+          typeof message.value !== "string" ||
+          !path.isAbsolute(message.value) ||
+          path.basename(message.value) !== ".backups"
+        )
+          throw Error("Invalid backup folder.");
+        const error = await shell.openPath(message.value);
+        if (error) throw Error(error);
+        value = true;
       } else if (message.action === "pick-folder") {
         const result = await dialog.showOpenDialog(window, {
-          title: "Choose a new or empty folder for your vault",
+          title: "Choose a vault folder",
           properties: ["openDirectory", "createDirectory"],
         });
         value = result.canceled ? null : result.filePaths[0];

@@ -1,3 +1,4 @@
+import { hasSplits } from "./transaction-splits.js";
 import {
   extractMerchant,
   merchantKey,
@@ -5,10 +6,15 @@ import {
 } from "./money-model.js";
 export const merchantGroupKey = (t) =>
   merchantKey(transactionDetails(t).merchant);
-export function merchantGroups(transactions) {
+export function merchantGroups(transactions, state = {}) {
   const groups = new Map();
   for (const raw of transactions) {
-    if (raw.skip || !["expense", "refund"].includes(raw.kind)) continue;
+    if (
+      hasSplits(state, raw) ||
+      raw.skip ||
+      !["expense", "refund"].includes(raw.kind)
+    )
+      continue;
     const t = transactionDetails(raw),
       key = merchantGroupKey(t);
     if (!key) continue;
@@ -34,8 +40,9 @@ export function merchantGroups(transactions) {
         a.name.localeCompare(b.name),
     );
 }
-export function applyGroupCategory(transactions, key, category) {
+export function applyGroupCategory(transactions, key, category, state = {}) {
   return transactions.map((t) =>
+    !hasSplits(state, t) &&
     !t.skip &&
     ["expense", "refund"].includes(t.kind) &&
     merchantGroupKey(t) === key
@@ -47,6 +54,7 @@ export function approvedNames(state, kind) {
   const candidates = state.transactions
     .filter(
       (t) =>
+        !hasSplits(state, t) &&
         !t.review &&
         t.category &&
         t.category !== "uncategorized" &&
@@ -73,6 +81,10 @@ export function approvedNames(state, kind) {
     const rules = new Map();
     for (const r of state.merchantRules || []) {
       const key = merchantKey(r.merchant);
+      if (r.category === "uncategorized") {
+        names.delete(key);
+        continue;
+      }
       const group = rules.get(key) || {
         name: extractMerchant(r.merchant).merchant,
         category: r.category,
@@ -83,6 +95,9 @@ export function approvedNames(state, kind) {
       rules.set(key, group);
     }
     for (const [key, group] of rules) names.set(key, group);
+    for (const r of state.merchantRules || []) {
+      if (r.category === "uncategorized") names.delete(merchantKey(r.merchant));
+    }
   }
   return [...names.values()]
     .map((n) => ({

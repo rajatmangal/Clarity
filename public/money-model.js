@@ -1,3 +1,4 @@
+import { hasSplits } from "./transaction-splits.js";
 export const themes = [
   {
     id: "ocean",
@@ -177,6 +178,7 @@ export function makeMerchantRule(t) {
 }
 export function rememberCategory(state, t) {
   if (
+    hasSplits(state, t) ||
     !["expense", "refund"].includes(t.kind) ||
     !t.category ||
     t.category === "uncategorized"
@@ -186,7 +188,14 @@ export function rememberCategory(state, t) {
   return {
     ...state,
     merchantRules: [
-      ...(state.merchantRules || []).filter((r) => r.key !== rule.key),
+      ...(state.merchantRules || [])
+        .filter((r) => r.key !== rule.key)
+        .map((r) =>
+          r.category === "uncategorized" &&
+          merchantKey(r.merchant) === merchantKey(rule.merchant)
+            ? { ...r, category: rule.category }
+            : r,
+        ),
       rule,
     ],
   };
@@ -194,6 +203,8 @@ export function rememberCategory(state, t) {
 export function applyMerchantLearning(transactions, state) {
   return transactions.map((input) => {
     const t = transactionDetails(input);
+    if (hasSplits(state, t)) return t;
+    if (!["expense", "refund"].includes(t.kind)) return { ...t, category: "" };
     if (
       t.category !== "uncategorized" ||
       !["expense", "refund"].includes(t.kind)
@@ -201,6 +212,15 @@ export function applyMerchantLearning(transactions, state) {
       return t;
     const key = merchantKey(t.description || t.merchant);
     const rules = state.merchantRules || [];
+    if (
+      rules.some(
+        (r) =>
+          r.category === "uncategorized" &&
+          (r.key === key ||
+            merchantKey(r.merchant) === merchantKey(t.merchant)),
+      )
+    )
+      return t;
     const exact = rules.find((r) => r.key === key);
     const aliases = rules.filter((r) =>
       [key, merchantKey(t.merchant)].includes(merchantKey(r.merchant)),
@@ -208,6 +228,7 @@ export function applyMerchantLearning(transactions, state) {
     const rule =
       exact ||
       (new Set(aliases.map((r) => r.category)).size === 1 ? aliases[0] : null);
+    if (rule?.category === "uncategorized") return t;
     if (rule && state.categories.some((c) => c.id === rule.category))
       return {
         ...t,
@@ -259,14 +280,22 @@ export function upgradeState(state) {
     theme: state.theme || "lavender",
     displayName: state.displayName || "",
     onboardingCompleted: state.onboardingCompleted ?? false,
+    importBatches: state.importBatches || [],
+    importEntries: state.importEntries || [],
+    statementCoverage: state.statementCoverage || [],
+    transactionSplits: state.transactionSplits || [],
     merchantRules: state.merchantRules || [],
     budgetOverrides: state.budgetOverrides || [],
     chartPreferences: state.chartPreferences || [],
+    savedViews: state.savedViews || [],
     categories: state.categories.map((c) => ({
       ...c,
       parentId: c.parentId || "",
       budgetScope: c.budgetScope || "separate",
     })),
-    transactions: state.transactions.map(transactionDetails),
+    transactions: state.transactions.map((t) => ({
+      ...transactionDetails(t),
+      category: ["expense", "refund"].includes(t.kind) ? t.category : "",
+    })),
   };
 }

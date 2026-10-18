@@ -12,17 +12,28 @@ import {
   Wallet,
 } from "lucide-react";
 import { themes } from "../public/money-model.js";
+import OpenVaultDialog from "./open-vault-dialog";
+import useFolderPicker from "./use-folder-picker";
 import { currencyCodes, currencyName } from "../public/currencies.js";
 
 const steps = ["Your journal", "Your files", "Your style", "Ready to begin"];
-export default function Onboarding({ state, meta, api, onFinish, onCancel }) {
+export default function Onboarding({
+  state,
+  meta,
+  api,
+  onFinish,
+  onCancel,
+  onOpenVault,
+}) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(state.displayName || "");
   const [currency, setCurrency] = useState(state.currency);
   const [theme, setTheme] = useState(state.theme);
   const [vaultPath, setVaultPath] = useState(meta.vaultPath || "");
   const [working, setWorking] = useState(false);
+  const [existingOpen, setExistingOpen] = useState(false);
   const [error, setError] = useState("");
+  const folderPicker = useFolderPicker(api, setVaultPath, setError);
   const heading = useRef(null);
   const locked = Boolean(state.transactions.length || state.balances.length);
   const server = meta.platform === "server";
@@ -39,6 +50,7 @@ export default function Onboarding({ state, meta, api, onFinish, onCancel }) {
   }, [step]);
   async function next(event) {
     event.preventDefault();
+    folderPicker.cancel();
     setError("");
     if (step === 1 && !vaultPath.trim()) {
       setError("Choose where to keep your journal, or use the current folder.");
@@ -197,27 +209,45 @@ export default function Onboarding({ state, meta, api, onFinish, onCancel }) {
                       : "Keep the current location, or choose a new or empty folder. Missing folders are created when you finish."}
                   </small>
                 </label>
+                <div className="onboarding-note">
+                  <FolderOpen size={21} />
+                  <div>
+                    <strong>Already have a Clarity vault?</strong>
+                    <p>
+                      After reinstalling, open your previous folder to keep its
+                      records and saved preferences.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={working}
+                      onClick={() => setExistingOpen(true)}
+                    >
+                      Open existing vault
+                    </button>
+                  </div>
+                </div>
                 <div className="onboarding-folder-actions">
                   {meta.folderPickerAvailable !== false && (
                     <button
                       className="btn"
                       type="button"
-                      disabled={working}
-                      onClick={async () => {
-                        setWorking(true);
-                        setError("");
-                        try {
-                          const result = await api("vault/pick", {});
-                          if (result.path) setVaultPath(result.path);
-                        } catch (e) {
-                          setError(e.message);
-                        } finally {
-                          setWorking(false);
-                        }
-                      }}
+                      disabled={working || folderPicker.picking}
+                      onClick={folderPicker.pick}
                     >
                       <FolderOpen size={18} />
-                      Choose folder…
+                      {folderPicker.picking
+                        ? "Choosing folder…"
+                        : "Choose folder…"}
+                    </button>
+                  )}
+                  {folderPicker.picking && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={folderPicker.cancel}
+                    >
+                      Cancel folder picker
                     </button>
                   )}
                   {vaultPath !== meta.vaultPath && (
@@ -395,6 +425,14 @@ export default function Onboarding({ state, meta, api, onFinish, onCancel }) {
           </p>
         </form>
       </section>
+      {existingOpen && (
+        <OpenVaultDialog
+          api={api}
+          meta={meta}
+          onOpened={onOpenVault}
+          onClose={() => setExistingOpen(false)}
+        />
+      )}
     </main>
   );
 }

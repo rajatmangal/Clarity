@@ -1,3 +1,4 @@
+import { categoryTransactions, splitsFor } from "./transaction-splits.js";
 import { inferDateOrder } from "./dates.js";
 import { budgetPlan } from "./budget-plan.js";
 import { extractMerchant, applyMerchantLearning } from "./money-model.js";
@@ -128,7 +129,7 @@ export function normalizeCSV(rows, map, account, existing = []) {
         ...extractMerchant(description),
         amount: Math.abs(signed),
         kind,
-        category: "uncategorized",
+        category: ["expense", "refund"].includes(kind) ? "uncategorized" : "",
         account: account.id,
         review,
         source: "import",
@@ -165,10 +166,11 @@ export function summarize(state, start, end) {
       .filter((t) => t.kind === "income")
       .reduce((s, t) => s + t.amount, 0);
   const spending = expense - refunds;
+  const allocated = categoryTransactions({ ...state, transactions: tx });
   const categories = state.categories
     .map((c) => ({
       ...c,
-      spent: tx
+      spent: allocated
         .filter((t) => t.category === c.id)
         .reduce(
           (s, t) =>
@@ -200,10 +202,15 @@ export function summarize(state, start, end) {
     refunds,
     net: income - spending,
     categories,
-    review: tx.filter(needsReview).length,
+    review: tx.filter((t) => needsReview(t, state)).length,
   };
 }
-export function needsReview(transaction) {
+export function needsReview(transaction, state) {
+  if (
+    state &&
+    splitsFor(state, transaction.id).some((s) => s.category === "uncategorized")
+  )
+    return true;
   if (["manual", "reviewed"].includes(transaction.source)) return false;
   return (
     !!transaction.review ||

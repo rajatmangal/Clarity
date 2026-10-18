@@ -13,6 +13,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { counted } from "../public/record-management.js";
 import { analysisData } from "../public/analysis.js";
 import { categoryLabel } from "../public/money-model.js";
 const charts = [
@@ -310,14 +311,14 @@ export default function AnalysisPage({ state, start, end, save, busy, demo }) {
         <article>
           <span>Average purchase</span>
           <strong>{fmt(data.average / 100)}</strong>
-          <small>{data.purchases} purchases in selected range</small>
+          <small>{counted(data.purchases, "purchase")} in selected range</small>
         </article>
         <article>
           <span>Largest merchant</span>
           <strong>{data.merchants[0]?.name || "No purchases yet"}</strong>
           <small>
             {data.merchants[0]
-              ? `${fmt(data.merchants[0].Spending)} net · ${data.merchants[0].purchases} purchases`
+              ? `${fmt(data.merchants[0].Spending)} net · ${counted(data.merchants[0].purchases, "purchase")}`
               : "Import a statement to compare merchants"}
           </small>
         </article>
