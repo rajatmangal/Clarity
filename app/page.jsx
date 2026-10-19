@@ -6,6 +6,7 @@ import {
 } from "../public/currencies.js";
 import { useEffect, useRef, useState } from "react";
 import OpenVaultDialog from "./open-vault-dialog";
+import AppSidebar, { navigationGroups } from "./app-sidebar";
 import AnalysisPage from "./analysis-page";
 import BulkTransactionModal from "./bulk-transaction-modal";
 import TransactionViews from "./transaction-views";
@@ -212,15 +213,6 @@ function Modal({ title, subtitle, children, onClose, wide = false }) {
     </dialog>
   );
 }
-const nav = [
-  ["Overview", LayoutDashboard],
-  ["Statements", FileSpreadsheet],
-  ["Analysis", ChartNoAxesCombined],
-  ["Transactions", ArrowLeftRight],
-  ["Budgets", Target],
-  ["Categories", Tags],
-  ["Accounts", Wallet],
-];
 export default function Home() {
   const currentYear = Number(today().slice(0, 4));
   const [data, setData] = useState(null),
@@ -276,15 +268,45 @@ export default function Home() {
   const saving = useRef(false);
   useEffect(() => {
     if (!mobile) return;
-    const previous = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
+    const rail = document.getElementById("clarity-navigation");
+    const main = document.querySelector(".shell-refined > main");
+    const previousInert = main?.inert || false;
     document.body.style.overflow = "hidden";
-    const escape = (e) => {
-      if (e.key === "Escape") setMobile(false);
+    if (main) main.inert = true;
+    rail?.querySelector(".rail-close")?.focus();
+    const keyboard = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobile(false);
+      }
+      if (event.key !== "Tab") return;
+      const targets = [
+        ...(rail?.querySelectorAll("a[href], button:not([disabled])") || []),
+      ].filter((el) => el.getClientRects().length);
+      const first = targets[0],
+        last = targets.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
     };
-    document.addEventListener("keydown", escape);
+    const screen = window.matchMedia("(max-width: 640px)");
+    const resize = () => {
+      if (!screen.matches) setMobile(false);
+    };
+    document.addEventListener("keydown", keyboard);
+    screen.addEventListener("change", resize);
     return () => {
-      document.body.style.overflow = previous;
-      document.removeEventListener("keydown", escape);
+      document.body.style.overflow = previousOverflow;
+      if (main) main.inert = previousInert;
+      document.removeEventListener("keydown", keyboard);
+      screen.removeEventListener("change", resize);
+      if (document.contains(previousFocus)) previousFocus?.focus();
     };
   }, [mobile]);
   const state = demo || data;
@@ -571,97 +593,34 @@ export default function Home() {
     setPage("Transactions");
     setTxPage(0);
   }
-  const currentTitle = {
-    Overview: "See your spending. Plan your saving.",
-    Analysis: "See the patterns. Choose your next move.",
-    Transactions: "Every little thing adds up.",
-    Budgets: "Make room for what matters.",
-    Categories: "A place for every purchase.",
-    Accounts: "See how far you’ve come.",
-    Statements: "Every statement. A clearer picture.",
-    Settings: "A space that’s yours.",
-  }[page];
+  const currentTitle = page;
+  const currentSection =
+    navigationGroups.find((group) =>
+      group.items.some(([label]) => label === page),
+    )?.label || "Preferences";
   return (
-    <div className="shell">
+    <div className="shell shell-refined">
       {mobile && (
         <button
           className="mobile-backdrop"
-          aria-label="Close navigation"
+          aria-label="Dismiss navigation"
+          tabIndex={-1}
           onClick={() => setMobile(false)}
         />
       )}
-      <aside className={mobile ? "sidebar open" : "sidebar"}>
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            setPage("Overview");
-          }}
-        >
-          <img className="clarity-mark" src="/brand/clarity.svg" alt="" />
-          clarity
-          <span className="brand-dot">.</span>
-        </a>
-        <div className="workspace">
-          <span className="avatar">
-            {state?.displayName?.trim().slice(0, 1).toUpperCase() || "C"}
-          </span>
-          <div>
-            {state?.displayName
-              ? `${state.displayName}’s journal`
-              : "My money journal"}
-            <small>Personal workspace</small>
-          </div>
-          <span className="local-dot" />
-        </div>
-        <p className="nav-label">WORKSPACE</p>
-        <nav>
-          {nav.map(([label, Icon]) => (
-            <button
-              key={label}
-              className={page === label ? "active" : ""}
-              onClick={() => {
-                setPage(label);
-                setMobile(false);
-              }}
-            >
-              <Icon size={19} />
-              {label}
-              {label === "Transactions" && summary?.review > 0 && (
-                <span className="count">{summary.review}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="local-card">
-            <ShieldCheck size={21} />
-            <strong>Yours. And only yours.</strong>
-            <p>
-              Saved locally. No bank logins.
-              <br />A little more peace of mind.
-            </p>
-            <span>
-              <i />
-              Markdown vault connected
-            </span>
-          </div>
-          <button
-            className={`settings-nav ${page === "Settings" ? "active" : ""}`}
-            onClick={() => {
-              setPage("Settings");
-              setMobile(false);
-            }}
-          >
-            <Settings size={19} />
-            Settings
-          </button>
-          <div className="sidebar-foot">
-            MADE FOR A CLEARER TOMORROW <Leaf size={12} />
-          </div>
-        </div>
-      </aside>
+      <AppSidebar
+        open={mobile}
+        page={page}
+        onNavigate={(destination) => {
+          setPage(destination);
+          setMobile(false);
+        }}
+        onClose={() => setMobile(false)}
+        displayName={state.displayName}
+        vaultPath={meta.vaultPath}
+        platform={meta.platform}
+        reviewCount={summary?.review || 0}
+      />
       <main>
         <header className="topbar">
           <div className="breadcrumb">
@@ -669,20 +628,25 @@ export default function Home() {
               className="icon-button mobile-toggle"
               aria-label="Toggle menu"
               aria-expanded={mobile}
+              aria-controls="clarity-navigation"
               onClick={() => setMobile(!mobile)}
             >
               <Menu size={20} />
             </button>
-            <span>My workspace</span>
+            <span className="breadcrumb-section">{currentSection}</span>
             <ChevronRight size={14} />
             <b>{page}</b>
           </div>
           <div className="top-actions">
-            <span className="privacy">
-              <i /> Local & private
+            <span className="header-local-status">
+              <i />
+              {meta.platform === "server" ? "Your server" : "On your device"}
+            </span>
+            <span className="header-currency" title="Your journal currency">
+              {state.currency}
             </span>
             <button
-              className="icon-button"
+              className="icon-button header-reload"
               title="Reload from Markdown vault"
               aria-label="Reload from Markdown vault"
               onClick={async () => {
@@ -690,11 +654,9 @@ export default function Home() {
                 notify("Reloaded your Markdown ledger");
               }}
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={16} strokeWidth={1.7} />
+              <span>Reload ledger</span>
             </button>
-            <span className="avatar small">
-              {state?.displayName?.trim().slice(0, 1).toUpperCase() || "C"}
-            </span>
           </div>
         </header>
         <div className="content">
@@ -726,13 +688,13 @@ export default function Home() {
             <div>
               <div className="eyebrow">
                 {page === "Overview"
-                  ? "A LITTLE CLARITY, EVERY DAY"
-                  : `YOUR MONEY / ${page.toUpperCase()}`}
+                  ? "FINANCIAL SNAPSHOT"
+                  : currentSection.toUpperCase()}
               </div>
               <h1>{currentTitle}</h1>
               <p>
                 {page === "Overview"
-                  ? "Know where it goes. Decide where you grow."
+                  ? "Spending, cash flow, and account balances in one place."
                   : page === "Statements"
                     ? "Track what you imported, confirm coverage, and safely undo a batch."
                     : page === "Analysis"
@@ -740,7 +702,7 @@ export default function Home() {
                       : page === "Transactions"
                         ? "One clear view of your spending, income, and everything in between."
                         : page === "Budgets"
-                          ? "Thoughtful limits, with plenty of room to live."
+                          ? "Plan your category limits and adjust individual months."
                           : page === "Accounts"
                             ? "Record your balances and follow your progress over time."
                             : page === "Categories"
